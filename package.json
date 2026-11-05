@@ -1,0 +1,25 @@
+{
+  "name": "hhpaisanos",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp run -r --parallel dev",
+    "build": "vp run -r build",
+    "test": "vp run -r test",
+    "typecheck": "vp run -r typecheck",
+    "lint": "vp lint --deny-warnings",
+    "format": "vp fmt",
+    "format:check": "vp fmt --check",
+    "check": "vp run lint && vp run format:check && vp run typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.3",
+    "vite-plus": "1.5.0"
+  },
+  "engines": {
+    "node": ">=24.15.0 <25"
+  },
+  "packageManager": "pnpm@12.0.0"
+}
