@@ -1,13 +1,13 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { afterAll, beforeAll, expect, it } from 'vite-plus/test';
-import { AppModule } from '../dist/app.module.js';
+import { HealthModule } from '../dist/health/health.module.js';
 
 let app;
 let baseUrl;
 
 beforeAll(async () => {
-  app = await NestFactory.create(AppModule, { logger: false });
+  app = await NestFactory.create(HealthModule, { logger: false });
   await app.listen(0, '127.0.0.1');
   baseUrl = await app.getUrl();
 }, 30000);
