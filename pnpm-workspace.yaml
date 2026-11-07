@@ -1,6 +1,9 @@
 packages:
   - apps/*
 
+allowBuilds:
+  esbuild: true
+
 minimumReleaseAgeExclude:
   - '@voidzero-dev/vite-plus-core@1.5.0'
   - '@voidzero-dev/vite-plus-darwin-arm64@1.5.0'

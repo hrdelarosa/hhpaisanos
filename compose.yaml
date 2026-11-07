@@ -1,0 +1,22 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: hhpaisanos-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: hhpaisanos
+      MYSQL_USER: hhpaisanos
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the root .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in the root .env}
+      TZ: UTC
+    ports:
+      - '127.0.0.1:3306:3306'
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD"
+      interval: 10s
+      timeout: 5s
+      retries: 10
