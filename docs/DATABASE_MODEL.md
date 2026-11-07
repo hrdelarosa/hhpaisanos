@@ -77,7 +77,7 @@ A user has one role in the existing design. Do not introduce office/territory sc
 ### `sesiones`
 `id`; `usuario_id FK`; `token_hash CHAR(64) UNIQUE`; `ultima_actividad_en DATETIME(6)`; `expira_por_inactividad_en DATETIME(6) NULL`; `expira_en_absoluto DATETIME(6)`; `revocada_en DATETIME(6) NULL`; `revocada_por FK usuarios NULL`; `motivo_revocacion VARCHAR(255) NULL`; `ip VARCHAR(45) NULL`; `user_agent VARCHAR(500) NULL`; `creado_en`.
 
-Keep opaque server-side sessions with an `httpOnly` cookie and hashed random token. Argon2id remains the password hashing choice. The prior 30-minute idle/10-hour absolute (ADMIN/ENLACE), seven-day absolute (OBS) and five-failures/15-minute lockout are **prior decisions to confirm** when consolidating security requirements, not database defaults.
+Keep opaque server-side sessions with an `httpOnly` cookie and hashed random token. Argon2id remains the password hashing choice. The confirmed auth policies supersede earlier durations: ADMIN has a 30-minute absolute lifetime; ENLACE and OBSERVADOR have three hours. There is no inactivity expiration or renewal; `expira_por_inactividad_en` remains NULL. Five failed logins cause a 15-minute lockout without extension by requests during the lock. These are application policies, not database defaults; see `REQUIREMENTS.md` section 9.
 
 ### `auditoria`
 `id`; `usuario_id FK NULL`; `sesion_id FK NULL`; `accion VARCHAR(100)`; `tipo_entidad VARCHAR(100)`; `entidad_id BINARY(16) NULL`; `valores_anteriores JSON NULL`; `valores_nuevos JSON NULL`; `motivo VARCHAR(500) NULL`; `canal VARCHAR(20) NULL`; `ip VARCHAR(45) NULL`; `user_agent VARCHAR(500) NULL`; `creado_en`. Index (`tipo_entidad`, `entidad_id`) and (`usuario_id`, `creado_en`).
@@ -182,7 +182,7 @@ Never authenticate a request solely from a Telegram username or client-supplied 
 2. **Report lifecycle:** draft creation, editing, submission, validation, observation, correction and annulment; whether a new version is allowed only after verification or also after an observed report.
 3. **Location requirements:** whether coordinates and accuracy should be stored from the start or postponed until the collection channel and authorization are defined.
 4. **Retention:** retention periods for accounts, sessions, audit, precise location data and report history.
-5. **Security timeouts:** preserve or revise the previous role-specific session/lockout parameters.
+5. **Security timeouts:** confirmed for auth; see section 5 and `REQUIREMENTS.md` section 9.
 6. **Assignment corrections:** permitted cancellation behavior once capture exists and whether replacement assignments require linking.
 7. **Access permissions:** validate the previous catalog against the new unified web app and actual operational roles without silently importing its old implementation status.
 
