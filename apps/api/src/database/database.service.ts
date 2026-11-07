@@ -36,7 +36,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query('SELECT 1');
       this.client = drizzle(this.pool, { schema, mode: 'default' });
     } catch {
-      await this.onModuleDestroy();
+      try {
+        await this.onModuleDestroy();
+      } catch {
+        // A secondary cleanup failure must not mask the sanitized initialization error.
+      }
       throw new Error(
         'Database initialization failed; verify configuration and MySQL availability',
       );

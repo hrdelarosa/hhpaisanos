@@ -52,6 +52,23 @@ it('sanitizes initialization errors and closes the failed pool', async () => {
   expect(() => service.db).toThrow('not initialized');
 });
 
+it('preserves the sanitized initialization failure when cleanup also fails', async () => {
+  pool.query.mockRejectedValueOnce(new Error('secret initialization details'));
+  pool.end.mockRejectedValueOnce(new Error('secret cleanup details'));
+  const service = new DatabaseService(config);
+
+  const failure = await service.onModuleInit().catch((error) => error);
+  expect(failure).toBeInstanceOf(Error);
+  expect(failure.message).toBe(
+    'Database initialization failed; verify configuration and MySQL availability',
+  );
+  expect(failure.cause).toBeUndefined();
+  expect(pool.end).toHaveBeenCalledOnce();
+  expect(() => service.db).toThrow('not initialized');
+  await service.onModuleDestroy();
+  expect(pool.end).toHaveBeenCalledOnce();
+});
+
 it('handles pool creation failures without leaking credentials', async () => {
   createPool.mockImplementationOnce(() => {
     throw new Error('secret');
