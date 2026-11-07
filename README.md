@@ -17,8 +17,8 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-- Web: <http://127.0.0.1:5173>
-- API health: <http://127.0.0.1:3000/api/health>
+- Web: <http://localhost:5173>
+- API health: <http://localhost:3000/api/health>
 
 Both servers bind to loopback only. The web development server proxies `/api`
 to Nest. The page displays loading, success, or failure based on the real health

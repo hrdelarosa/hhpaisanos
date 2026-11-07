@@ -4,10 +4,10 @@ import { defineConfig } from "vite-plus";
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: "127.0.0.1",
+    host: "localhost",
     port: 5173,
     strictPort: true,
-    proxy: { "/api": "http://127.0.0.1:3000" },
+    proxy: { "/api": "http://localhost:3000" },
   },
   test: {
     environment: "jsdom",
