@@ -8,7 +8,7 @@ let baseUrl;
 
 beforeAll(async () => {
   app = await NestFactory.create(HealthModule, { logger: false });
-  await app.listen(0, '127.0.0.1');
+  await app.listen(0, 'localhost');
   baseUrl = await app.getUrl();
 }, 30000);
 
