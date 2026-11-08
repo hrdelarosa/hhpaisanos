@@ -284,6 +284,55 @@ changes, expiration/revocation and audit-failure rollback. Run them with
 Integration files run sequentially with a 30-second per-test budget for Docker I/O;
 security concurrency tests still send concurrent requests within each test.
 
+## Operatives backend
+
+The initial module exposes only:
+
+| Endpoint                  | Permission          | Behavior                                                                              |
+| ------------------------- | ------------------- | ------------------------------------------------------------------------------------- |
+| `POST /api/operatives`    | `operatives:create` | Accepts `name`, `startDate`, `endDate`; creates `borrador` with atomic audit          |
+| `GET /api/operatives`     | `operatives:read`   | Filters by `name` (literal substring) and `status`; paginates with `page` and `limit` |
+| `GET /api/operatives/:id` | `operatives:read`   | Retrieves a UUIDv7 operative or returns 404                                           |
+
+Dates are strict civil `YYYY-MM-DD` values in the MySQL DATE range, with start <= end.
+Names are trimmed without changing casing, accents or internal whitespace. The new
+`0001_operatives_name_dates_unique` migration rejects equivalent names with identical
+dates using the existing column collation (verified `utf8mb4_0900_ai_ci` in isolated
+MySQL 8.4). Conflicts return 409, including concurrent submissions. Overlapping
+intervals are allowed. Editing, transitions and deletion are not implemented.
+
+List responses contain `items`, `page`, `limit`, and `total`. Defaults are page 1
+and limit 20 (maximum 100), ordered by start date descending, then UUID descending.
+Details expose `id`, `name`, `startDate`, `endDate`, `status`, `createdAt`, `updatedAt`;
+timestamps are UTC strings with six fractional digits. Global session, mandatory
+password-change, CSRF and permission protections apply unchanged.
+
+**Permission dependency:** the Users module owns initial provisioning. Approved
+grants are ADMIN: `operatives:read` and `operatives:create`; ENLACE:
+`operatives:read`; OBSERVADOR: neither. No grants or role bypasses are introduced
+by Operatives. Use the Users-owned `users:provision-permissions` command described
+below; without provisioned grants, real accounts cannot use these endpoints.
+
+Apply migrations only with explicit authorization. Before migrating an existing
+database, verify `operativos.nombre` collation and check for duplicate tuples and
+untrimmed legacy names. Resolve any conflicts explicitly; the migration neither
+normalizes nor deletes existing records. A duplicate prevents index creation.
+The original migration remains unchanged.
+
+Operatives integration tests reuse the Compose MySQL helper but create their own
+random database, synthetic database user and permission fixtures. They do not
+require shared development credentials. Run after building the API:
+
+```sh
+pnpm --filter @hhpaisanos/api build
+pnpm --filter @hhpaisanos/api exec vp test run test/operatives.integration.test.mjs --no-file-parallelism --testTimeout 30000
+```
+
+When reusing a Compose service started from another worktree, set
+`COMPOSE_PROJECT_NAME` to its existing project name (locally `hhpaisanos`).
+Do not start a second shared MySQL service. Tests apply migrations only to their
+disposable database and remove their database/user afterward.
+
 ## Backend user administration
 
 Users operates within the single Guerrero scope. Every endpoint requires both an
@@ -370,7 +419,7 @@ to manage this limited catalog. It is not an HTTP permission editor.
 
 Users integration tests exercise authorization, protected accounts, observer links,
 credential lifecycle, concurrent login/mutation races, pagination, provisioning and
-audit-failure rollback. Auth/Users tests also accept a dedicated synthetic MySQL
+audit-failure rollback. Auth/Users/database tests also accept a dedicated synthetic MySQL
 account named `hhp_test_<16 lowercase hex digits>` instead of the development user;
 that account must be created and removed by the isolated test setup, never by the API.
 
@@ -393,9 +442,10 @@ that account must be created and removed by the isolated test setup, never by th
 
 Health only reports process availability, not database or external-service
 readiness. Startup verifies MySQL connectivity and shutdown closes the pool.
-Backend authentication, permission guards and scoped account administration are implemented;
-other business features, frontend authentication, Telegram, deployment and CI/CD remain
-deferred. Persistence tables alone do not implement their workflows.
+Backend authentication, permission guards, scoped account administration and initial
+operative creation/consultation are implemented; other business workflows, frontend
+authentication, Telegram, deployment and CI/CD remain deferred. Persistence tables
+alone do not implement their workflows.
 
 `docs/REQUIREMENTS.md` and `docs/DATABASE_MODEL.md` record the confirmed auth
 policies. Other pending functional decisions must be resolved before implementing

@@ -6,6 +6,7 @@ import {
   decimal,
   mysqlTable,
   smallint,
+  uniqueIndex,
   varchar,
 } from 'drizzle-orm/mysql-core';
 import { id } from '../uuid.js';
@@ -24,6 +25,7 @@ export const operativos = mysqlTable(
     ...timestamps(),
   },
   (t) => [
+    uniqueIndex('operativos_nombre_fechas_unique').on(t.nombre, t.fechaInicio, t.fechaFin),
     check('operativos_fechas_check', sql`${t.fechaInicio} <= ${t.fechaFin}`),
     check('operativos_estado_check', sql`${t.estado} IN ('borrador', 'activo', 'cerrado')`),
   ],

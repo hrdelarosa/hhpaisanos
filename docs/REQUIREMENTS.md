@@ -41,7 +41,15 @@ The system must support:
 - Preventing assignments outside the operative's date range.
 - Preserving historical operational information.
 
-The exact reopening and modification policies must be validated before implementation.
+Confirmed initial backend scope:
+
+- Create, list, and retrieve operatives across the Guerrero scope.
+- Creation accepts only name, start date, and end date; the initial status is always `borrador`.
+- Dates are real civil calendar dates with start date less than or equal to end date. Overlapping operative intervals are allowed.
+- Trim leading/trailing name whitespace, preserving casing, accents and internal whitespace. Equivalent names under the existing database column collation and identical start/end dates are duplicates.
+- Require `operatives:read` for listing/details and `operatives:create` for creation, without role-name bypasses. The approved initial grants are ADMIN: both; ENLACE: read; OBSERVADOR: neither. Initial permission provisioning belongs to the Users module.
+- Creation and its administrative audit event commit atomically.
+- Editing, status transitions, activation, closing, reopening and deletion are not exposed in the initial release. Modification and reopening policies remain pending.
 
 ## 4. Attention modules
 
