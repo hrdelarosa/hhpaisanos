@@ -23,6 +23,6 @@ import { CredentialRateGuard } from './guards/credential-rate.guard.js';
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_FILTER, useClass: AuthExceptionFilter },
   ],
-  exports: [AuthService],
+  exports: [AuthService, CredentialRateGuard],
 })
 export class AuthModule {}

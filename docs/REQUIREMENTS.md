@@ -143,7 +143,19 @@ Authentication policies confirmed for the auth implementation:
 - Account deactivation must revoke existing sessions when account management is implemented.
 - Password-change requests require rate limiting and failed-verification protection independent of login lockout.
 
-Retention policies remain pending. Administrative reset belongs to the future account-management module.
+Retention policies remain pending.
+
+Account-management policies confirmed for the initial Users implementation:
+
+- One organizational scope: Guerrero. Office-level restrictions await an organizational model.
+- Administrative HTTP operations require both ADMIN role and the explicit operation permission; ADMIN has no implicit bypass.
+- Authorized administrators may view ADMIN accounts, but Users cannot create, modify, deactivate, reset or assign ADMIN accounts/roles. This restriction also protects the last active administrator under concurrency.
+- Account creation and role assignment are limited to active ENLACE and OBSERVADOR roles. Existing observer-linked accounts reject effective role changes and retain their relationship/profile state.
+- Username is immutable after creation; only full name is editable initially. Accounts are never physically deleted.
+- Temporary passwords are securely generated server-side and returned only in the successful creation/reset response, never stored in plaintext. Delivery requires an authorized operational channel.
+- Administrative reset clears temporary login lockout, requires password change and revokes sessions without reactivating an inactive account. Deactivation and effective role changes revoke sessions; reactivation never restores them.
+- Account mutations and relevant audit events are atomic. Role-permission editing and observer profile management are not exposed through Users.
+- Permission provisioning is explicit, idempotent and audited, never automatic at startup or migration time. The approved closed set is `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read`, `operatives:read`, `operatives:create`. ADMIN receives all ten; ENLACE receives only `operatives:read`; OBSERVADOR receives none of this set. Other permission mappings remain unchanged.
 
 ## 10. Audit and traceability
 
