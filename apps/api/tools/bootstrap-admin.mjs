@@ -1,11 +1,12 @@
 import 'reflect-metadata';
 import { emitKeypressEvents } from 'node:readline';
 import { eq } from 'drizzle-orm';
+import { validateSync } from 'class-validator';
 import { loadDatabaseConfig } from '../dist/database/database.config.js';
 import { DatabaseService } from '../dist/database/database.service.js';
 import { auditoria, roles, usuarios } from '../dist/database/schema/index.js';
 import { hashPassword } from '../dist/modules/auth/auth.service.js';
-import { validateNewPassword } from '../dist/modules/auth/dto/change-password.dto.js';
+import { ChangePasswordDto } from '../dist/modules/auth/dto/change-password.dto.js';
 
 function hiddenPassword(label) {
   if (!process.stdin.isTTY) throw new Error('Interactive terminal required');
@@ -56,7 +57,13 @@ try {
     );
   }
   const password = await hiddenPassword('Temporary password (hidden): ');
-  validateNewPassword(password);
+  const input = Object.assign(new ChangePasswordDto(), {
+    currentPassword: password,
+    newPassword: password,
+  });
+  if (validateSync(input, { validationError: { target: false, value: false } }).length) {
+    throw new Error('Invalid temporary password');
+  }
   if (password !== (await hiddenPassword('Repeat password (hidden): ')))
     throw new Error('Passwords do not match');
   const passwordHash = await hashPassword(password);

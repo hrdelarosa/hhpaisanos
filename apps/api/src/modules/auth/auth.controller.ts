@@ -2,8 +2,8 @@ import { Body, Controller, Get, Header, HttpCode, Post, Req, Res, UseGuards } fr
 import type { Response } from 'express';
 import { AuthService } from './auth.service.js';
 import type { AuthRequest, AuthUser } from './auth.types.js';
-import { LoginPipe, type LoginDto } from './dto/login.dto.js';
-import { ChangePasswordPipe, type ChangePasswordDto } from './dto/change-password.dto.js';
+import { LoginDto } from './dto/login.dto.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { Public } from './decorators/public.decorator.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
 import { AllowPasswordChange } from './decorators/allow-password-change.decorator.js';
@@ -22,7 +22,7 @@ export class AuthController {
   @UseGuards(CredentialRateGuard)
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
-  async login(@Body(LoginPipe) input: LoginDto, @Res({ passthrough: true }) response: Response) {
+  async login(@Body() input: LoginDto, @Res({ passthrough: true }) response: Response) {
     const session = await this.auth.login(input);
     response.cookie(this.auth.config.cookieName, session.token, {
       ...this.cookieOptions(),
@@ -54,7 +54,7 @@ export class AuthController {
   @Header('Cache-Control', 'no-store')
   async changePassword(
     @Req() request: AuthRequest,
-    @Body(ChangePasswordPipe) input: ChangePasswordDto,
+    @Body() input: ChangePasswordDto,
     @Res({ passthrough: true }) response: Response,
   ) {
     await this.auth.changePassword(request.auth!, input);

@@ -80,6 +80,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await app?.close();
+  // AppModule registers the same global ValidationPipe used by the real HTTP application.
   app = await NestFactory.create(TestModule, { logger: false, abortOnError: false });
   await app.listen(0, 'localhost');
   baseUrl = await app.getUrl();
@@ -141,6 +142,101 @@ async function login(account, suppliedPassword = password) {
   });
   return { response, cookie: response.headers.get('set-cookie')?.split(';')[0] };
 }
+
+it('rejects unexpected fields and malformed credential types without leaking values or recording login failures', async () => {
+  const account = await user();
+  const invalidLogins = [
+    { username: account.username, password, role: 'ADMIN' },
+    { username: 123, password },
+    { username: ' \t\n', password },
+    { username: account.username, password: 123456789012345 },
+    { username: account.username, password: ['secret'] },
+    { username: account.username, password: '' },
+    { username: account.username },
+    [],
+  ];
+  for (const body of invalidLogins) {
+    const response = await request('auth/login', { method: 'POST', body });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ statusCode: 400, message: 'Invalid request input' });
+  }
+  const [unchanged] = await db.select().from(t.usuarios).where(eq(t.usuarios.id, account.id));
+  expect(unchanged.intentosFallidos).toBe(0);
+  expect(await db.select().from(t.sesiones).where(eq(t.sesiones.usuarioId, account.id))).toEqual(
+    [],
+  );
+  expect(await db.select().from(t.auditoria).where(eq(t.auditoria.usuarioId, account.id))).toEqual(
+    [],
+  );
+
+  const { cookie } = await login(account);
+  for (const body of [
+    { currentPassword: password, newPassword: 'A valid replacement password', extra: 'secret' },
+    { currentPassword: 123456789012345, newPassword: 'A valid replacement password' },
+    { currentPassword: '', newPassword: 'A valid replacement password' },
+    { currentPassword: password, newPassword: 123456789012345 },
+    { currentPassword: password, newPassword: null },
+  ]) {
+    const response = await request('auth/change-password', { method: 'POST', cookie, body });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ statusCode: 400, message: 'Invalid request input' });
+  }
+  expect((await request('auth/me', { cookie })).status).toBe(200);
+});
+
+it('preserves exact Unicode credentials and code-point/UTF-8 limits through login and password changes', async () => {
+  const account = await user();
+  account.username = '  ' + '☀️'.repeat(24); // 50 code points, including leading spaces and variation selectors.
+  // Exactly 1024 UTF-8 bytes; encodeURI-based byte validators throw on the unpaired surrogate.
+  const legacyPassword = '🌵'.repeat(255) + '\uD800x';
+  await db
+    .update(t.usuarios)
+    .set({ nombreUsuario: account.username, passwordHash: await hashPassword(legacyPassword) })
+    .where(eq(t.usuarios.id, account.id));
+  expect((await login({ username: account.username + 'x' }, legacyPassword)).response.status).toBe(
+    400,
+  );
+  expect((await login(account, legacyPassword + 'x')).response.status).toBe(400);
+  const { response, cookie } = await login(account, legacyPassword);
+  expect(response.status).toBe(200);
+  expect((await (await request('auth/me', { cookie })).json()).username).toBe(account.username);
+
+  const maximumPassword = ' ' + '☀️'.repeat(63) + ' '; // 128 code points, not 128 UTF-16 code units.
+  for (const body of [
+    { currentPassword: legacyPassword + 'x', newPassword: maximumPassword },
+    { currentPassword: legacyPassword, newPassword: '☀️'.repeat(7) }, // 14 code points.
+    { currentPassword: legacyPassword, newPassword: maximumPassword + 'x' },
+  ]) {
+    expect((await request('auth/change-password', { method: 'POST', cookie, body })).status).toBe(
+      400,
+    );
+  }
+  expect(
+    (
+      await request('auth/change-password', {
+        method: 'POST',
+        cookie,
+        body: { currentPassword: legacyPassword, newPassword: maximumPassword },
+      })
+    ).status,
+  ).toBe(204);
+  const maximum = await login(account, maximumPassword);
+  expect(maximum.response.status).toBe(200);
+  // 15 code points; trimming or Unicode normalization changes both its length and its credentials.
+  const minimumPassword = ' ' + '☀️'.repeat(5) + 'e\u0301x ';
+  expect(
+    (
+      await request('auth/change-password', {
+        method: 'POST',
+        cookie: maximum.cookie,
+        body: { currentPassword: maximumPassword, newPassword: minimumPassword },
+      })
+    ).status,
+  ).toBe(204);
+  expect((await login(account, minimumPassword.trim())).response.status).toBe(401);
+  expect((await login(account, minimumPassword.normalize('NFC'))).response.status).toBe(401);
+  expect((await login(account, minimumPassword)).response.status).toBe(200);
+});
 
 it('issues only hashed fixed-duration sessions for each role, expires them, and revokes logout idempotently', async () => {
   for (const [role, minutes] of [
