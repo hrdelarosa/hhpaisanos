@@ -17,6 +17,7 @@
     "db:check": "nest build && node tools/database.mjs check",
     "db:migrate": "nest build && node tools/database.mjs migrate",
     "auth:bootstrap-admin": "nest build && node tools/bootstrap-admin.mjs",
+    "roles:init-dev": "nest build && node tools/initialize-development-roles.mjs",
     "users:provision-permissions": "nest build && node tools/provision-users-permissions.mjs"
   },
   "dependencies": {

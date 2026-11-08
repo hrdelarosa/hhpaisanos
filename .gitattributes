@@ -2,3 +2,5 @@
 /apps/web/vite.config.ts text eol=lf
 /compose.yaml text eol=lf
 /vite.config.ts text eol=lf
+/README.md text eol=lf
+/pnpm-workspace.yaml text eol=lf

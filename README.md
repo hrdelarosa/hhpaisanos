@@ -391,8 +391,26 @@ codes. It does not implement Operatives endpoints. Prerequisites: migrated schem
 existing ADMIN/ENLACE/OBSERVADOR roles, and an existing active ADMIN account with
 an active ADMIN role. Missing roles cause a failure without writes; this command
 does not create roles or accounts. The development bootstrap creates only ADMIN.
-Provision the remaining approved role catalog through an authorized setup procedure
-before running this command; a general role-management interface remains out of scope.
+Initialize missing approved roles explicitly in the disposable local development
+database, after applying migrations with authorization:
+
+```sh
+pnpm --filter @hhpaisanos/api roles:init-dev
+```
+
+This repeatable command creates only missing active ADMIN, ENLACE and OBSERVADOR
+roles, using the existing Drizzle UUIDv7 defaults. It preserves existing identifiers
+and metadata, and refuses inactive approved roles without making changes. It never
+creates users, grants permissions or modifies role-permission mappings. It requires
+`DB_HOST=localhost`, `DB_NAME=hhpaisanos`, `DB_USER=hhpaisanos`, valid local credentials,
+and `NODE_ENV` unset or `development`. It never runs on startup or during migrations.
+A general role-management interface remains out of scope.
+
+For initial setup, run this command before `auth:bootstrap-admin`; an ADMIN role
+already created by bootstrap is also preserved. Then obtain the active administrator's
+UUIDv7 and preview/apply permission provisioning separately. The administrator must
+complete the mandatory password change before using Users or Operatives endpoints.
+Each database-writing step requires explicit authorization; none runs automatically.
 
 ```sh
 # Preview only; UUID identifies the administrative actor, not a password or session.
