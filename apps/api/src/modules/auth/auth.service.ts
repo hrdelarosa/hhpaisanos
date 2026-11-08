@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -221,6 +222,52 @@ export class AuthService implements OnModuleInit {
         .where(eq(sesiones.id, session.id));
       await this.audit(tx, 'auth.session.revoked', session.usuarioId, session.id);
     });
+  }
+
+  // Locks the actor before administrative writes; callers keep all mutations in this transaction.
+  async requireCurrentContext(db: AuthDb, context: AuthContext): Promise<AuthContext> {
+    const [user] = await db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, context.user.id))
+      .for('update');
+    if (!user?.activo) throw new UnauthorizedException('Authentication required');
+    const [session] = await db
+      .select({ id: sesiones.id })
+      .from(sesiones)
+      .where(
+        and(
+          eq(sesiones.id, context.sessionId),
+          eq(sesiones.usuarioId, user.id),
+          isNull(sesiones.revocadaEn),
+          gt(sesiones.expiraEnAbsoluto, sql`UTC_TIMESTAMP(6)`),
+        ),
+      )
+      .for('share');
+    const [role] = await db.select().from(roles).where(eq(roles.id, user.rolId)).for('share');
+    if (!session || !role?.activo) throw new UnauthorizedException('Authentication required');
+    if (user.debeCambiarPassword)
+      throw new ForbiddenException({
+        code: 'PASSWORD_CHANGE_REQUIRED',
+        message: 'Password change required',
+      });
+    const grants = await db
+      .select({ code: permisos.codigo })
+      .from(rolPermisos)
+      .innerJoin(permisos, eq(rolPermisos.permisoId, permisos.id))
+      .where(eq(rolPermisos.rolId, role.id))
+      .for('share');
+    return {
+      sessionId: session.id,
+      user: {
+        id: user.id,
+        username: user.nombreUsuario,
+        fullName: user.nombreCompleto,
+        role: role.codigo,
+        permissions: grants.map((grant) => grant.code),
+        mustChangePassword: user.debeCambiarPassword,
+      },
+    };
   }
 
   async changePassword(context: AuthContext, input: ChangePasswordDto): Promise<void> {

@@ -56,6 +56,7 @@ apps/api/src/health/  Nest process-health module
 apps/api/src/database/ MySQL infrastructure and API-internal Drizzle schemas
 apps/api/drizzle/     Versioned SQL migrations and Drizzle metadata
 apps/api/src/modules/auth/ Authentication, server-side sessions and permission guards
+apps/api/src/modules/users/ Account administration and read-only access catalogs
 apps/web/src/         Single React application
 docs/                Functional requirements and proposed database model
 ```
@@ -253,8 +254,8 @@ public routes explicitly with `@Public()`; health remains public. Use
 `@CurrentUser()` for the authenticated identity. ADMIN has no implicit permission
 bypass. Permissions and user/role activity are read on each request. Resource
 ownership checks belong to their future business modules. Account deactivation
-must call `AuthService.revokeUserSessions` in the same transaction while holding
-the user row lock. No user-management endpoints or permission matrix are included.
+calls `AuthService.revokeUserSessions` in the same transaction while holding
+the user row lock. Role-permission matrix editing is not exposed over HTTP.
 
 Security events use an explicit audit allowlist without credentials, token/password
 hashes, submitted usernames, IPs or user-agent strings. Password/session changes and
@@ -283,6 +284,96 @@ changes, expiration/revocation and audit-failure rollback. Run them with
 Integration files run sequentially with a 30-second per-test budget for Docker I/O;
 security concurrency tests still send concurrent requests within each test.
 
+## Backend user administration
+
+Users operates within the single Guerrero scope. Every endpoint requires both an
+active ADMIN account with a completed password change and its explicit permission.
+ADMIN has no implicit bypass. Authorized administrators can view ADMIN accounts,
+but **no Users mutation can create, modify, deactivate, reset or assign ADMIN**.
+This also prevents concurrent requests from disabling the last active administrator.
+
+| Endpoint                             | Input                                                     | Required permission    |
+| ------------------------------------ | --------------------------------------------------------- | ---------------------- |
+| `POST /api/users`                    | `username`, `fullName`, `roleId`                          | `users:create`         |
+| `GET /api/users`                     | Optional `page`, `pageSize`, `search`, `active`, `roleId` | `users:read`           |
+| `GET /api/users/:id`                 | UUIDv7                                                    | `users:read`           |
+| `PATCH /api/users/:id`               | `fullName`, `reason`                                      | `users:update`         |
+| `PATCH /api/users/:id/status`        | `active`, `reason`                                        | `users:change-status`  |
+| `PUT /api/users/:id/role`            | `roleId`, `reason`                                        | `users:assign-role`    |
+| `POST /api/users/:id/reset-password` | `reason`                                                  | `users:reset-password` |
+| `GET /api/roles`                     | None                                                      | `roles:read`           |
+| `GET /api/permissions`               | None                                                      | `permissions:read`     |
+
+Mutations use the same Origin/JSON/CSRF contract as Auth. Creation returns 201;
+reset returns 200; other mutations return 204. Creation and reset return only
+`{ id, temporaryPassword }` with `Cache-Control: no-store`. Deliver the temporary
+password to its owner through an authorized channel: no email or Telegram delivery
+is implemented. A lost response requires another authorized reset; plaintext is
+never persisted, audited or retrievable. Temporary passwords are generated with
+256 random bits and Argon2id-hashed using Auth's existing policy. Credential
+generation shares Auth's bounded per-process IP rate limiter.
+
+Usernames are immutable and retain exact Unicode/whitespace semantics. Only
+`fullName` is editable. One active ENLACE or OBSERVADOR role may be assigned;
+unknown, inactive and ADMIN roles are rejected. Existing observer links cannot be
+changed here, and effective role changes are blocked while linked. Account state
+does not change observer profile state. New OBSERVADOR accounts are initially
+unlinked; the role alone does not grant ownership of an observer's information.
+
+Reset clears login failures/temporary lockout, requires a password change and
+revokes live sessions without reactivating an inactive account. Deactivation and
+effective role changes also revoke live sessions in the same transaction. Reactivation
+never restores revoked sessions. Repeated identical profile/status/role updates
+are no-ops without fictitious audit events. Mutations recheck the actor's session,
+role and permissions under transactional locks. Audit writes and session revocations
+are atomic with the account change; personal-name edits record the changed field,
+not copies of the names. No physical deletion is exposed.
+
+Pagination defaults to page 1 / 20 items, with at most 100 items per page and a
+stable creation-time/ID order. The response is `{ items, page, pageSize, total }`.
+`active` accepts only `true` or `false`; `search` matches literal substrings in
+username/fullName, including literal `%`, `_` and `!`. Account and catalog responses
+are non-cacheable and never contain password hashes or session tokens.
+
+### Explicit initial permission provisioning
+
+Users owns the single initial provisioning command, including the agreed Operatives
+codes. It does not implement Operatives endpoints. Prerequisites: migrated schema,
+existing ADMIN/ENLACE/OBSERVADOR roles, and an existing active ADMIN account with
+an active ADMIN role. Missing roles cause a failure without writes; this command
+does not create roles or accounts. The development bootstrap creates only ADMIN.
+Provision the remaining approved role catalog through an authorized setup procedure
+before running this command; a general role-management interface remains out of scope.
+
+```sh
+# Preview only; UUID identifies the administrative actor, not a password or session.
+pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approved initial access"
+# Explicitly apply the previewed mapping.
+pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approved initial access" --apply
+```
+
+The closed mapping contains exactly ten codes:
+
+- ADMIN: all eight Users/catalog permissions above, plus `operatives:read` and `operatives:create`.
+- ENLACE: only `operatives:read` from that set.
+- OBSERVADOR: none from that set.
+
+Grants belong to roles, so all accounts with the role receive them. Applying the
+command creates missing permission rows, adds missing approved grants and removes
+incorrect grants **within these ten codes and three roles only**. Other permissions,
+other roles and existing descriptions are untouched. Actual changes have individual
+administrative audit events with the actor and supplied reason in one transaction;
+repeating an already-applied mapping writes nothing. The command never runs on
+startup or during migrations and does not create/reset accounts. Run it only with
+explicit authorization against the intended database; it requires database privileges
+to manage this limited catalog. It is not an HTTP permission editor.
+
+Users integration tests exercise authorization, protected accounts, observer links,
+credential lifecycle, concurrent login/mutation races, pagination, provisioning and
+audit-failure rollback. Auth/Users tests also accept a dedicated synthetic MySQL
+account named `hhp_test_<16 lowercase hex digits>` instead of the development user;
+that account must be created and removed by the isolated test setup, never by the API.
+
 ## Git workflow
 
 - `main` is the stable, production-oriented branch; this initial foundation is
@@ -302,8 +393,8 @@ security concurrency tests still send concurrent requests within each test.
 
 Health only reports process availability, not database or external-service
 readiness. Startup verifies MySQL connectivity and shutdown closes the pool.
-Backend authentication and permission guards are implemented; administrative CRUD,
-business features, frontend authentication, Telegram, deployment and CI/CD remain
+Backend authentication, permission guards and scoped account administration are implemented;
+other business features, frontend authentication, Telegram, deployment and CI/CD remain
 deferred. Persistence tables alone do not implement their workflows.
 
 `docs/REQUIREMENTS.md` and `docs/DATABASE_MODEL.md` record the confirmed auth
