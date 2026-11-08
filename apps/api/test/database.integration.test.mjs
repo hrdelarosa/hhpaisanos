@@ -36,6 +36,7 @@ let config;
 let originalDatabase;
 const ids = { role: v7(), user: v7(), observer: v7(), operative: v7(), module: v7() };
 const mark = '2026-11-05 12:34:56.123456';
+const migrationJournal = JSON.parse(readFileSync('drizzle/meta/_journal.json', 'utf8'));
 
 function migration(env = {}) {
   return spawnSync(process.execPath, ['tools/database.mjs', 'migrate'], {
@@ -117,7 +118,7 @@ it('creates exactly the 11 approved tables and tracks the migration without reap
     'usuarios',
   ]);
   const [before] = await service.db.execute(sql`SELECT * FROM __drizzle_migrations`);
-  expect(before).toHaveLength(1);
+  expect(before).toHaveLength(migrationJournal.entries.length);
   expect(migration().status).toBe(0);
   const [after] = await service.db.execute(sql`SELECT * FROM __drizzle_migrations`);
   expect(after).toEqual(before);
@@ -134,30 +135,33 @@ it('reports migration failures without leaking credentials', () => {
 it('does not track failed migrations or assume partially applied DDL was rolled back', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'hhpaisanos-migrations-'));
   const journal = JSON.parse(readFileSync('drizzle/meta/_journal.json', 'utf8'));
-  const initial = journal.entries[0];
+  const applied = [...journal.entries];
+  const latest = applied.at(-1);
   mkdirSync(join(folder, 'meta'));
-  copyFileSync(`drizzle/${initial.tag}.sql`, join(folder, `${initial.tag}.sql`));
+  for (const entry of applied) {
+    copyFileSync(`drizzle/${entry.tag}.sql`, join(folder, `${entry.tag}.sql`));
+  }
   journal.entries.push({
-    ...initial,
-    idx: 1,
-    when: initial.when + 1,
-    tag: '0001_synthetic_failure',
+    ...latest,
+    idx: latest.idx + 1,
+    when: latest.when + 1,
+    tag: 'synthetic_failure',
   });
   writeFileSync(join(folder, 'meta', '_journal.json'), JSON.stringify(journal));
   writeFileSync(
-    join(folder, '0001_synthetic_failure.sql'),
+    join(folder, 'synthetic_failure.sql'),
     'CREATE TABLE synthetic_partial_ddl (id INT PRIMARY KEY);\n--> statement-breakpoint\nTHIS IS NOT VALID SQL;',
   );
   try {
     await rejectsCode(migrate(service.db, { migrationsFolder: folder }), 'ER_PARSE_ERROR');
     const [tracking] = await service.db.execute(sql`SELECT * FROM __drizzle_migrations`);
-    expect(tracking).toHaveLength(1);
+    expect(tracking).toHaveLength(applied.length);
     const [partial] = await service.db.execute(sql`SHOW TABLES LIKE 'synthetic_partial_ddl'`);
     expect(partial).toHaveLength(1);
   } finally {
     await service.db.execute(sql`DROP TABLE IF EXISTS synthetic_partial_ddl`);
-    unlinkSync(join(folder, `${initial.tag}.sql`));
-    unlinkSync(join(folder, '0001_synthetic_failure.sql'));
+    for (const entry of applied) unlinkSync(join(folder, `${entry.tag}.sql`));
+    unlinkSync(join(folder, 'synthetic_failure.sql'));
     unlinkSync(join(folder, 'meta', '_journal.json'));
     rmdirSync(join(folder, 'meta'));
     rmdirSync(folder);

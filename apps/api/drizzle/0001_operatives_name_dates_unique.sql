@@ -1,0 +1,1 @@
+ALTER TABLE `operativos` ADD CONSTRAINT `operativos_nombre_fechas_unique` UNIQUE(`nombre`,`fecha_inicio`,`fecha_fin`);
