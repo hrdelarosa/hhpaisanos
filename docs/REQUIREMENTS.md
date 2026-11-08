@@ -131,7 +131,19 @@ The system must provide:
 - Resource ownership checks for observer access.
 - Protection of sensitive operations.
 
-Session durations, lockout thresholds, and retention policies must be confirmed before implementation.
+Authentication policies confirmed for the auth implementation:
+
+- Fixed absolute session lifetimes: ADMIN 30 minutes; ENLACE and OBSERVADOR three hours.
+- No sliding expiration, renewal, refresh tokens, or inactivity-based expiration.
+- Argon2id password hashing and opaque server-side sessions; persist only SHA-256 token hashes.
+- Five consecutive failed login attempts lock the account for 15 minutes. Requests during a lock do not extend it; successful authentication or lock expiry resets the counter.
+- New passwords contain 15–128 Unicode code points, including spaces and Unicode, without composition rules. Reuse of the current password is rejected.
+- Password changes revoke all sessions, including the current one, and require a new login.
+- Temporary credentials permit only current-user consultation, password change, and logout.
+- Account deactivation must revoke existing sessions when account management is implemented.
+- Password-change requests require rate limiting and failed-verification protection independent of login lockout.
+
+Retention policies remain pending. Administrative reset belongs to the future account-management module.
 
 ## 10. Audit and traceability
 
@@ -183,7 +195,7 @@ Exact report layouts, filters, exports, and dashboards must be defined against t
 2. Attention report draft, submission, review, correction, and annulment lifecycle.
 3. Geographic location and photographic evidence requirements.
 4. Rules for correcting assignments that already contain activity.
-5. Session expiration, account lockout, and data retention.
+5. Data retention.
 6. Exact access-control matrix for the new implementation.
 7. Official attention concepts and required reporting formats.
 8. Operational schedules, capture windows, and exception handling.

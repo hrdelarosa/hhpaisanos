@@ -55,7 +55,7 @@ not proxy API requests; integration is verified with `pnpm dev`.
 apps/api/src/health/  Nest process-health module
 apps/api/src/database/ MySQL infrastructure and API-internal Drizzle schemas
 apps/api/drizzle/     Versioned SQL migrations and Drizzle metadata
-apps/api/src/modules/ Future business features (not created until needed)
+apps/api/src/modules/auth/ Authentication, server-side sessions and permission guards
 apps/web/src/         Single React application
 docs/                Functional requirements and proposed database model
 ```
@@ -206,6 +206,83 @@ Integration tests verify that restricted audit-account design. Operational
 history deletion must also be excluded from runtime privileges. Account/grant
 provisioning outside isolated tests is not automated in this module.
 
+## Backend authentication
+
+The API exposes:
+
+| Endpoint                         | Input / behavior                                                                                     |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `POST /api/auth/login`           | `{ "username": "...", "password": "..." }`; sets the session cookie                                  |
+| `GET /api/auth/me`               | Returns `id`, `username`, `fullName`, `role`, `permissions`, `mustChangePassword`                    |
+| `POST /api/auth/logout`          | Revokes the current session and clears its cookie; idempotent                                        |
+| `POST /api/auth/change-password` | `{ "currentPassword": "...", "newPassword": "..." }`; revokes every session and requires a new login |
+
+All mutating requests, including login/logout, require `Content-Type: application/json`,
+`X-HHP-CSRF: 1`, and an `Origin` in `AUTH_ORIGINS`. Send `{}` for logout. Browser
+requests use the existing same-origin `/api` development proxy; no credentialed
+cross-origin CORS access is enabled. Authentication responses are not cacheable.
+
+Sessions have fixed absolute lifetimes: **ADMIN 30 minutes; ENLACE and OBSERVADOR
+3 hours**. Requests never renew sessions, slide expiration, or impose an idle
+timeout. Session tokens have 256 random bits; only SHA-256 hashes are persisted.
+The cookie is host-only, HTTP-only, `SameSite=Lax`, and `Path=/`. Production requires
+`NODE_ENV=production`, explicit HTTPS `AUTH_ORIGINS`, and HTTPS transport; its cookie
+is `Secure` with the `__Host-` prefix. Plain HTTP origins are accepted only for
+loopback development. HTTPS origins also select secure cookies in development.
+The API does not enable `trust proxy`; forwarded IP headers are not trusted.
+
+Passwords use Argon2id (19 MiB memory, two iterations, parallelism one, random salt).
+New passwords must contain **15–128 Unicode code points**, with spaces and Unicode
+allowed, without normalization or composition rules; the current password cannot
+be reused. Temporary credentials restrict access to `me`, password change and logout.
+
+Five consecutive failed logins lock the account for **15 minutes**. Requests during
+the lock do not extend it. Successful login or expiry resets the failed-attempt
+counter (expiry is applied lazily at the next login). Password changes allow at most
+five failed current-password verifications per account in a rolling 15-minute
+window, enforced through audit records under a user-row lock. They do not lock out
+login or invalidate other sessions on failure. A bounded per-process backstop also
+limits login/password-change requests to 30 per IP per minute, including malformed
+inputs. With multiple API instances, add a shared edge limiter; behind a reverse
+proxy the backstop currently sees the proxy IP. Account-level protections remain
+shared through MySQL. No session/audit purge or retention policy is implemented.
+
+`AuthModule` registers authentication, CSRF and permission guards globally. Mark
+public routes explicitly with `@Public()`; health remains public. Use
+`@RequirePermissions('resource:action')` for all required permissions and
+`@CurrentUser()` for the authenticated identity. ADMIN has no implicit permission
+bypass. Permissions and user/role activity are read on each request. Resource
+ownership checks belong to their future business modules. Account deactivation
+must call `AuthService.revokeUserSessions` in the same transaction while holding
+the user row lock. No user-management endpoints or permission matrix are included.
+
+Security events use an explicit audit allowlist without credentials, token/password
+hashes, submitted usernames, IPs or user-agent strings. Password/session changes and
+their audit events commit atomically. Unexpected API errors return a generic 500
+and log no driver exception details, because Drizzle errors may embed SQL values.
+
+### Explicit local administrator bootstrap
+
+After explicitly migrating the disposable local database, run:
+
+```sh
+pnpm --filter @hhpaisanos/api auth:bootstrap-admin local-admin
+```
+
+The command requires an interactive terminal and asks twice for a hidden temporary
+password. It runs only against the documented localhost development database, creates
+the ADMIN role if absent, refuses an inactive role or any existing administrator,
+and creates an audited account requiring a password change. It never runs on startup,
+seeds no permissions, and cannot reset an existing account. Production provisioning
+is deliberately not automated. Automated tests use isolated synthetic fixtures instead.
+
+Auth integration tests reuse the isolated MySQL setup and test complete security
+flows, including concurrent failures, password-change/login races, CSRF, permission
+changes, expiration/revocation and audit-failure rollback. Run them with
+`pnpm --filter @hhpaisanos/api test:integration`; ordinary API tests do not need MySQL.
+Integration files run sequentially with a 30-second per-test budget for Docker I/O;
+security concurrency tests still send concurrent requests within each test.
+
 ## Git workflow
 
 - `main` is the stable, production-oriented branch; this initial foundation is
@@ -225,10 +302,11 @@ provisioning outside isolated tests is not automated in this module.
 
 Health only reports process availability, not database or external-service
 readiness. Startup verifies MySQL connectivity and shutdown closes the pool.
-Authentication, authorization, business features, Telegram, deployment, and
-CI/CD remain deferred; persistence tables do not implement their workflows.
+Backend authentication and permission guards are implemented; administrative CRUD,
+business features, frontend authentication, Telegram, deployment and CI/CD remain
+deferred. Persistence tables alone do not implement their workflows.
 
-The original `AGENTS.md`, `docs/REQUIREMENTS.md`, and `docs/DATABASE_MODEL.md`
-remain unchanged. Functional decisions pending in those documents must be
-resolved before implementing the affected business modules, including report
-draft optionality and attendance/report transitions.
+`docs/REQUIREMENTS.md` and `docs/DATABASE_MODEL.md` record the confirmed auth
+policies. Other pending functional decisions must be resolved before implementing
+the affected business modules, including report draft optionality and
+attendance/report transitions.

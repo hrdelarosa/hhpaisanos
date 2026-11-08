@@ -7,3 +7,8 @@ coverage/
 !.env.example
 *.log
 .DS_Store
+
+# Local project agent skills
+.opencode/skills/
+.agents/skills/
+.claude/skills/

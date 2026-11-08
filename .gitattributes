@@ -1,0 +1,4 @@
+# Preserve the LF endings required by .editorconfig and Vite+ on checkout.
+/apps/web/vite.config.ts text eol=lf
+/compose.yaml text eol=lf
+/vite.config.ts text eol=lf

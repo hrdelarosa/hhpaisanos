@@ -1,6 +1,24 @@
-import { Module } from '@nestjs/common';
+import { Module, ValidationPipe } from '@nestjs/common';
+import { APP_PIPE } from '@nestjs/core';
 import { HealthModule } from './health/health.module.js';
 import { DatabaseModule } from './database/database.module.js';
+import { AuthModule } from './modules/auth/auth.module.js';
 
-@Module({ imports: [HealthModule, DatabaseModule] })
+@Module({
+  imports: [HealthModule, DatabaseModule, AuthModule],
+  providers: [
+    {
+      provide: APP_PIPE,
+      useFactory: () =>
+        new ValidationPipe({
+          whitelist: true,
+          forbidNonWhitelisted: true,
+          transform: true,
+          transformOptions: { enableImplicitConversion: false },
+          validationError: { target: false, value: false },
+          disableErrorMessages: true,
+        }),
+    },
+  ],
+})
 export class AppModule {}

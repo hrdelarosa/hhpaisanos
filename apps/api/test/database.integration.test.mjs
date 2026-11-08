@@ -22,6 +22,7 @@ import { AppModule } from '../dist/app.module.js';
 import { loadDatabaseConfig } from '../dist/database/database.config.js';
 import { DatabaseService } from '../dist/database/database.service.js';
 import * as tables from '../dist/database/schema/index.js';
+import { rootSql } from './helpers/mysql.mjs';
 
 const suffix = randomBytes(8).toString('hex');
 const database = `hhpaisanos_test_${suffix}`;
@@ -35,26 +36,6 @@ let config;
 let originalDatabase;
 const ids = { role: v7(), user: v7(), observer: v7(), operative: v7(), module: v7() };
 const mark = '2026-11-05 12:34:56.123456';
-
-function rootSql(statement) {
-  // SQL is sent on stdin; root credentials stay inside the Compose container.
-  const result = spawnSync(
-    'docker',
-    [
-      'compose',
-      'exec',
-      '-T',
-      'mysql',
-      'sh',
-      '-c',
-      'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -u root --batch --skip-column-names',
-    ],
-    { cwd: '../..', input: statement, encoding: 'utf8', timeout: 30000 },
-  );
-  if (result.status !== 0)
-    throw new Error('Isolated database setup/cleanup failed; check the Compose MySQL service');
-  return result.stdout.trim();
-}
 
 function migration(env = {}) {
   return spawnSync(process.execPath, ['tools/database.mjs', 'migrate'], {
