@@ -38,6 +38,7 @@ const password = 'Synthetic password 🌵 123';
 const origin = 'http://localhost:5173';
 let app,
   db,
+  dbUser,
   baseUrl,
   originalDatabase,
   originalOrigins,
@@ -50,13 +51,14 @@ beforeAll(async () => {
     config.host !== 'localhost' ||
     config.port !== 3306 ||
     config.database !== 'hhpaisanos' ||
-    config.user !== 'hhpaisanos'
+    (config.user !== 'hhpaisanos' && !/^hhp_test_[a-f0-9]{16}$/.test(config.user))
   ) {
     throw new Error('Integration tests require the documented localhost Compose configuration');
   }
   if (!rootSql('SELECT VERSION();').startsWith('8.4.')) throw new Error('MySQL 8.4 required');
+  dbUser = config.user;
   rootSql(
-    `CREATE DATABASE \`${database}\`; GRANT ALL PRIVILEGES ON \`${database}\`.* TO 'hhpaisanos'@'%';`,
+    `CREATE DATABASE \`${database}\`; GRANT ALL PRIVILEGES ON \`${database}\`.* TO '${config.user}'@'%';`,
   );
   created = true;
   originalDatabase = process.env.DB_NAME;
@@ -97,7 +99,7 @@ afterAll(async () => {
     else process.env.AUTH_ORIGINS = originalOrigins;
     if (created)
       rootSql(
-        `DROP DATABASE \`${database}\`; REVOKE ALL PRIVILEGES ON \`${database}\`.* FROM 'hhpaisanos'@'%';`,
+        `DROP DATABASE \`${database}\`; REVOKE ALL PRIVILEGES ON \`${database}\`.* FROM '${dbUser}'@'%';`,
       );
   }
 }, 30000);

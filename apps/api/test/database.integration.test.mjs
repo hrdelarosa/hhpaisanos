@@ -62,7 +62,7 @@ beforeAll(async () => {
     config.host !== 'localhost' ||
     config.port !== 3306 ||
     config.database !== 'hhpaisanos' ||
-    config.user !== 'hhpaisanos'
+    (config.user !== 'hhpaisanos' && !/^hhp_test_[a-f0-9]{16}$/.test(config.user))
   ) {
     throw new Error('Integration tests require the documented localhost Compose configuration');
   }
@@ -70,7 +70,7 @@ beforeAll(async () => {
     throw new Error('Integration tests require MySQL 8.4');
   rootSql(`CREATE DATABASE \`${database}\`;`);
   created = true;
-  rootSql(`GRANT ALL PRIVILEGES ON \`${database}\`.* TO 'hhpaisanos'@'%';`);
+  rootSql(`GRANT ALL PRIVILEGES ON \`${database}\`.* TO '${config.user}'@'%';`);
   originalDatabase = process.env.DB_NAME;
   process.env.DB_NAME = database;
   const result = migration();
@@ -89,7 +89,7 @@ afterAll(async () => {
     if (runtimeCreated) rootSql(`DROP USER '${runtimeUser}'@'%';`);
     if (created) {
       rootSql(
-        `DROP DATABASE \`${database}\`; REVOKE ALL PRIVILEGES ON \`${database}\`.* FROM 'hhpaisanos'@'%';`,
+        `DROP DATABASE \`${database}\`; REVOKE ALL PRIVILEGES ON \`${database}\`.* FROM '${config.user}'@'%';`,
       );
     }
   }
@@ -419,7 +419,9 @@ it('can enforce append-only audit through runtime account grants', async () => {
 it('starts Nest with the real database, preserves health and cleans up on shutdown', async () => {
   const response = await fetch(`${await app.getUrl()}/api/health`);
   expect(await response.json()).toEqual({ status: 'ok' });
-  expect((await fetch(`${await app.getUrl()}/api/users`)).status).toBe(404);
+  for (const feature of ['users', 'operatives']) {
+    expect((await fetch(`${await app.getUrl()}/api/${feature}`)).status).toBe(401);
+  }
   await app.close();
   app = undefined;
   expect(() => service.db).toThrow('not initialized');

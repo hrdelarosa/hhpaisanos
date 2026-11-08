@@ -4,9 +4,10 @@ import { HealthModule } from './health/health.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { OperativesModule } from './modules/operatives/operatives.module.js';
+import { UsersModule } from './modules/users/users.module.js';
 
 @Module({
-  imports: [HealthModule, DatabaseModule, AuthModule, OperativesModule],
+  imports: [HealthModule, DatabaseModule, AuthModule, UsersModule, OperativesModule],
   providers: [
     {
       provide: APP_PIPE,
