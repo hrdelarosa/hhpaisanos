@@ -76,6 +76,16 @@ The system must support:
 
 Account reassignment and unlinking policies remain pending.
 
+Confirmed initial Observers backend scope:
+
+- Create, list, retrieve, edit, activate and deactivate observer profiles across Guerrero.
+- Profiles are created active and without an account. Editable fields are first names, last names and optional phone; explicit null clears the phone. Preserve supplied spelling and whitespace; names and non-null phones must not be blank. Names allow at most 100 Unicode code points each and phones 20.
+- Profile edits require at least one editable field and a nonblank reason (up to 500 code points). Status changes require a boolean and the same reason contract. Identical updates are no-ops without audit events.
+- Profile activation/deactivation never modifies the linked account, its sessions or historical relationships. No physical deletion is exposed.
+- Require explicit `observers:read`, `observers:create`, `observers:update` and `observers:change-status` permissions, without role-name bypasses. Approved future grants: ADMIN and ENLACE receive all four; OBSERVADOR receives none. Provisioning integration is deferred; the existing closed permission command is unchanged.
+- Mutations revalidate current authority transactionally and commit atomically with audit. Personal edits audit changed field names rather than copies of names or phones.
+- Account linking, unlinking, reassignment, self-service and assignment workflows are not exposed by this module.
+
 ## 6. Assignments
 
 Each assignment identifies:
