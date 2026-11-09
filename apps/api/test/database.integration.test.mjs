@@ -132,6 +132,65 @@ it('reports migration failures without leaking credentials', () => {
   expect(result.stderr).not.toContain(config.password);
 });
 
+it('preserves assignment foreign keys and refuses 0002 on nonempty legacy tables before altering history', () => {
+  const previous = JSON.parse(readFileSync('drizzle/meta/0001_snapshot.json', 'utf8'));
+  const current = JSON.parse(readFileSync('drizzle/meta/0002_snapshot.json', 'utf8'));
+  expect(current.tables.asignaciones.foreignKeys).toEqual(previous.tables.asignaciones.foreignKeys);
+  expect(current.tables.asignaciones.compositePrimaryKeys).toEqual(
+    previous.tables.asignaciones.compositePrimaryKeys,
+  );
+  expect(current.tables.auditoria).toEqual(previous.tables.auditoria);
+  const legacy = `hhpaisanos_test_${randomBytes(8).toString('hex')}`;
+  const baseline = migrationJournal.entries
+    .slice(0, 2)
+    .map((entry) =>
+      readFileSync(`drizzle/${entry.tag}.sql`, 'utf8').replaceAll('--> statement-breakpoint', ''),
+    )
+    .join('\n');
+  rootSql(`CREATE DATABASE \`${legacy}\`;`);
+  try {
+    rootSql(`USE \`${legacy}\`; ${baseline}`);
+    rootSql(`USE \`${legacy}\`;
+      INSERT INTO roles(id,codigo,nombre,activo) VALUES(0x01,'SYNTHETIC','Synthetic',1);
+      INSERT INTO usuarios(id,rol_id,nombre_usuario,nombre_completo,password_hash,activo,debe_cambiar_password,intentos_fallidos)
+        VALUES(0x02,0x01,'synthetic','Synthetic','synthetic',1,0,0);
+      INSERT INTO observadores(id,nombres,apellidos,activo) VALUES(0x03,'Synthetic','Observer',1);
+      INSERT INTO operativos(id,nombre,fecha_inicio,fecha_fin,estado) VALUES(0x04,'Synthetic','2026-12-01','2026-12-31','borrador');
+      INSERT INTO modulos_atencion(id,nombre,municipio,activo) VALUES(0x05,'Synthetic','Synthetic',1);
+      INSERT INTO asignaciones(id,operativo_id,observador_id,modulo_id,fecha,hora_inicio,hora_fin,creado_por)
+        VALUES(0x06,0x04,0x03,0x05,'2026-12-01','09:00:00','17:00:00',0x02);`);
+    const before = rootSql(
+      `SELECT HEX(id),fecha,hora_inicio,hora_fin FROM \`${legacy}\`.asignaciones;`,
+    );
+    const migrationSql = readFileSync('drizzle/0002_persistent_assignments.sql', 'utf8').replaceAll(
+      '--> statement-breakpoint',
+      '',
+    );
+    expect(() => rootSql(`USE \`${legacy}\`; ${migrationSql}`)).toThrow(
+      'Isolated database setup/cleanup failed',
+    );
+    expect(
+      rootSql(`SELECT HEX(id),fecha,hora_inicio,hora_fin FROM \`${legacy}\`.asignaciones;`),
+    ).toBe(before);
+    expect(
+      rootSql(
+        `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='${legacy}' AND table_name='asignaciones' AND column_name='vigente_desde';`,
+      ),
+    ).toBe('0');
+  } finally {
+    rootSql(`DROP DATABASE \`${legacy}\`;`);
+  }
+  const actual = JSON.parse(
+    rootSql(
+      `SELECT JSON_OBJECTAGG(CONSTRAINT_NAME,DELETE_RULE) FROM information_schema.referential_constraints WHERE constraint_schema='${database}' AND table_name='asignaciones';`,
+    ),
+  );
+  expect(Object.keys(actual).sort()).toEqual(
+    Object.keys(previous.tables.asignaciones.foreignKeys).sort(),
+  );
+  expect(Object.values(actual)).toEqual(['RESTRICT', 'RESTRICT', 'RESTRICT', 'RESTRICT']);
+});
+
 it('does not track failed migrations or assume partially applied DDL was rolled back', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'hhpaisanos-migrations-'));
   const journal = JSON.parse(readFileSync('drizzle/meta/_journal.json', 'utf8'));
@@ -282,7 +341,8 @@ it('retains cancelled assignments while allowing exact active replacements', asy
     operativoId: ids.operative,
     observadorId: ids.observer,
     moduloId: ids.module,
-    fecha: '2026-11-05',
+    vigenteDesde: '2026-11-05',
+    vigenteHasta: '2026-11-30',
     horaInicio: '08:00:00',
     horaFin: '16:00:00',
     creadoPor: ids.user,
@@ -301,6 +361,14 @@ it('retains cancelled assignments while allowing exact active replacements', asy
     );
   }
   const first = v7();
+  await rejectsCode(
+    service.db.insert(tables.asignaciones).values({ ...assignment, vigenteHasta: '2026-11-04' }),
+    'ER_CHECK_CONSTRAINT_VIOLATED',
+  );
+  await rejectsCode(
+    service.db.insert(tables.asignaciones).values({ ...assignment, versionBloqueo: 0 }),
+    'ER_CHECK_CONSTRAINT_VIOLATED',
+  );
   await service.db.insert(tables.asignaciones).values({ ...assignment, id: first });
   await rejectsCode(service.db.insert(tables.asignaciones).values(assignment), 'ER_DUP_ENTRY');
   await service.db
@@ -319,7 +387,8 @@ it('retains cancelled assignments while allowing exact active replacements', asy
   const rows = await service.db.select().from(tables.asignaciones);
   expect(rows).toHaveLength(3);
   expect(rows.filter((r) => r.activa === 1)).toHaveLength(1);
-  expect(rows[0].fecha).toBe('2026-11-05');
+  expect(rows[0].vigenteDesde).toBe('2026-11-05');
+  expect(rows[0].vigenteHasta).toBe('2026-11-30');
   expect(rows[0].horaInicio).toBe('08:00:00');
 });
 

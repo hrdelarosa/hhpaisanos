@@ -7,7 +7,7 @@
 ## 1. Design principles
 
 1. **Observer versus account:** `observadores` represents an operational person, while `usuarios` represents login credentials. An observer may exist without an account. An observer account has a nullable, unique 1:1 link from `observadores.usuario_id`.
-2. **Assignment-centered model:** each `asignaciones` record identifies an observer, an operative, a service module, a calendar date and a same-day shift. Attendance events and attention reports belong to that assignment.
+2. **Assignment-centered model:** each `asignaciones` record identifies an observer, an operative, a service module, an inclusive validity period and stable daily scheduled hours. Daily attendance events and reports reference the applicable historical period and include their own date. Assignment validity is not a calendar of attendance obligations.
 3. **Single source of business rules:** the API enforces domain rules for web, authorized manual entry and future Telegram input. `canal` records where an entry originated, not a different data model.
 4. **Historical accuracy:** no physical deletion of historical operational records. Corrections of confirmed records create a new version. Revisions and significant state changes are auditable within the same transaction.
 5. **No redundant aggregates:** totals are computed from detail records. Cached/denormalized aggregates are a later performance decision, not part of the initial schema.
@@ -104,22 +104,25 @@ The initial Operatives API creates `borrador` records only. Names are trimmed at
 Check coordinate ranges and require both coordinates present or both absent. GPS/geo-fence columns are **optional preparedness**, not authorization to collect coordinates.
 
 ### `asignaciones`
-`id`; `operativo_id FK`; `observador_id FK`; `modulo_id FK`; `fecha DATE`; `hora_inicio TIME`; `hora_fin TIME`; `cancelada_en DATETIME(6) NULL`; `creado_por FK usuarios`; timestamps.
+`id`; `operativo_id FK`; `observador_id FK`; `modulo_id FK`; `vigente_desde DATE`; `vigente_hasta DATE`; `hora_inicio TIME`; `hora_fin TIME`; `version_bloqueo INT UNSIGNED DEFAULT 1`; `cancelada_en DATETIME(6) NULL`; generated `activa TINYINT` (`1` when not cancelled, otherwise `NULL`); `creado_por FK usuarios`; timestamps.
 
-- Same-day shifts only; `hora_fin > hora_inicio`.
-- Dates must fall within the operative window.
-- One observer may have multiple same-day assignments without overlapping shifts. Validate overlapping intervals transactionally; unique indexes alone do not enforce arbitrary interval overlaps.
-- Keep cancelled assignments for history. Use the existing nullable generated-current marker approach or a verified equivalent to block exact duplicates of active assignments.
-- Reject a cancellation that would invalidate existing attendance/attention records, unless a separately authorized correction workflow explicitly handles it.
+- Persistent periods only, never daily assignment generation. CHECK `vigente_desde <= vigente_hasta`, `version_bloqueo > 0`, and same-day `00:00:00 <= hora_inicio < hora_fin <= 23:59:59`.
+- Dates fall within a draft/active operative's window; creation/effective rescheduling requires active observer/module resources.
+- At most one non-cancelled assignment per observer/calendar date across operatives, irrespective of scheduled hours. Serialize through the observer row and check inclusive interval overlap using current transactional reads; the unique index only blocks exact duplicates.
+- Unique (`operativo_id`, `observador_id`, `modulo_id`, `vigente_desde`, `vigente_hasta`, `hora_inicio`, `hora_fin`, `activa`). Index (`observador_id`, `vigente_desde`, `vigente_hasta`) and (`modulo_id`, `vigente_desde`, `vigente_hasta`). `activa` means not cancelled, not necessarily applicable today.
+- Preserve module/hours by closing the old interval at D−1 and creating a new period at future date D. Whole-period future replacement cancels the old programming. Keep observer/operative fixed and link previous/replacement IDs in atomic audit events.
+- Cancel only programming not yet started; terminate started periods by shortening their inclusive end without removing elapsed days. Never delete/reactivate records or modify unrelated future periods. Integer locking versions reject stale mutations.
+- Migration `0002_persistent_assignments` requires an empty assignments table and preserves all four RESTRICT FKs. It refuses a nonempty legacy table before changing dates; do not infer a full operative period from a legacy single date. Prior migrations remain unchanged.
+- No working-day calendar or attendance enforcement is inferred. Before future capture exists, validate record dates against the exact referenced period and lock that assignment against concurrent period changes. Do not invalidate any associated activity by shortening/cancelling its period.
 
 ## 7. Attendance with correction history
 
 ### `registros_asistencia`
-`id`; `asignacion_id FK`; `tipo VARCHAR(10)` (`entrada`, `salida`); `version INT UNSIGNED` (starts at 1); `vigente BOOLEAN NULL` (`1` for current, `NULL` for superseded); `registrado_en DATETIME(6)`; `latitud DECIMAL(9,6) NULL`; `longitud DECIMAL(9,6) NULL`; `precision_m DECIMAL(10,3) NULL`; `canal VARCHAR(20)` (`manual`, `web`, future `telegram`); `registrado_por FK usuarios`; `motivo_captura_manual VARCHAR(500) NULL`; `estado VARCHAR(20)` (`verificada`, `por_revisar`, `aceptada`, `rechazada`); `alertas JSON`; `revisado_por FK usuarios NULL`; `revisado_en DATETIME(6) NULL`; `observaciones VARCHAR(500) NULL`; `motivo_correccion VARCHAR(500) NULL`; timestamps.
+`id`; `asignacion_id FK`; `fecha_asistencia DATE`; `tipo VARCHAR(10)` (`entrada`, `salida`); `version INT UNSIGNED` (starts at 1); `vigente BOOLEAN NULL` (`1` for current, `NULL` for superseded); `registrado_en DATETIME(6)`; `latitud DECIMAL(9,6) NULL`; `longitud DECIMAL(9,6) NULL`; `precision_m DECIMAL(10,3) NULL`; `canal VARCHAR(20)` (`manual`, `web`, future `telegram`); `registrado_por FK usuarios`; `motivo_captura_manual VARCHAR(500) NULL`; `estado VARCHAR(20)` (`verificada`, `por_revisar`, `aceptada`, `rechazada`); `alertas JSON`; `revisado_por FK usuarios NULL`; `revisado_en DATETIME(6) NULL`; `observaciones VARCHAR(500) NULL`; `motivo_correccion VARCHAR(500) NULL`; timestamps.
 
 Indexes/constraints:
-- Unique (`asignacion_id`, `tipo`, `version`).
-- Unique (`asignacion_id`, `tipo`, `vigente`) where historical rows have `vigente = NULL` and the current row has `vigente = 1`.
+- Unique (`asignacion_id`, `fecha_asistencia`, `tipo`, `version`).
+- Unique (`asignacion_id`, `fecha_asistencia`, `tipo`, `vigente`) where historical rows have `vigente = NULL` and the current row has `vigente = 1`.
 - `CHECK (vigente IS NULL OR vigente = 1)`; version positive; coordinates valid and paired; precision nonnegative.
 - A new corrected mark is inserted at a higher version while the previous version becomes non-current, in one transaction with audit; do not modify original marked time in place.
 - A duplicate initial `entrada`/`salida` is rejected rather than silently creating version 2. Versions are created only through an authorized correction procedure.
@@ -137,14 +140,14 @@ Indexes/constraints:
 This is a global catalog unless requirements specify otherwise. Do not invent official concept names. Preserve historical meaning: deactivate, rather than rename/reinterpret, referenced concepts.
 
 ### `registros_atencion`
-`id`; `asignacion_id FK`; `version INT UNSIGNED` (starts at 1); `vigente BOOLEAN NULL` (`1` current, `NULL` superseded); `canal VARCHAR(20)`; `registrado_por FK usuarios`; `estado VARCHAR(20)` (`borrador`, `enviado`, `validado`, `observado`); `revisado_por FK usuarios NULL`; `revisado_en DATETIME(6) NULL`; `observaciones VARCHAR(500) NULL`; `motivo_correccion VARCHAR(500) NULL`; timestamps.
+`id`; `asignacion_id FK`; `fecha_reporte DATE`; `version INT UNSIGNED` (starts at 1); `vigente BOOLEAN NULL` (`1` current, `NULL` superseded); `canal VARCHAR(20)`; `registrado_por FK usuarios`; `estado VARCHAR(20)` (`borrador`, `enviado`, `validado`, `observado`); `revisado_por FK usuarios NULL`; `revisado_en DATETIME(6) NULL`; `observaciones VARCHAR(500) NULL`; `motivo_correccion VARCHAR(500) NULL`; timestamps.
 
 Indexes/constraints:
-- Unique (`asignacion_id`, `version`).
-- Unique (`asignacion_id`, `vigente`) with historical `NULL` and current `1`.
+- Unique (`asignacion_id`, `fecha_reporte`, `version`).
+- Unique (`asignacion_id`, `fecha_reporte`, `vigente`) with historical `NULL` and current `1`.
 - Validated or observed reports require a reviewer and review time; all required transitions are enforced in the API transaction.
 - An editable draft is the **current version** until submitted. Corrections after confirmation create a new report version with a new set of items rather than overwriting the validated history.
-- Only one current logical report exists per assignment, even if there are several historical versions.
+- Only one current logical report exists per assignment and report date, even if there are several historical versions. Late capture references the applicable historical period, not necessarily today's period.
 
 ### `registro_atencion_items`
 Composite primary key (`registro_atencion_id`, `concepto_id`); `cantidad INT UNSIGNED`; `especificacion VARCHAR(500) NULL`; timestamps. Both columns of the key are foreign keys.

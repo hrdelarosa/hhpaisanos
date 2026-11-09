@@ -192,11 +192,12 @@ only the identified test resources. Development tables/data are not touched.
 
 ### Integrity and audit boundary
 
-FKs use `RESTRICT` to protect referenced history. The active-assignment unique
-index blocks exact duplicates while retaining any number of cancelled versions;
-it does not enforce arbitrary interval overlaps. Assignment dates within the
-operative range, overlap locking, cancellation with activity, audit allowlists,
-and atomic business mutations belong to future feature implementations.
+FKs use `RESTRICT` to protect referenced history. The non-cancelled-assignment
+unique index blocks exact duplicates while retaining cancelled periods; it does
+not enforce interval exclusions. Assignments enforces validity within the operative,
+exclusive observer periods, transactional locking and atomic audit. Attendance/report
+integration remains deferred and must protect activity against period changes before
+capture is enabled.
 
 The Compose-created `hhpaisanos` account intentionally has broad privileges on
 the **disposable development database** so it can apply migrations. It does not
@@ -482,7 +483,7 @@ are non-cacheable and never contain password hashes or session tokens.
 ### Explicit initial permission provisioning
 
 Users owns the single centralized provisioning command for Users/catalog, Operatives,
-Observers and Attention Modules permissions. It does not implement operational endpoints.
+Observers, Attention Modules and Assignments permissions. It does not implement operational endpoints.
 Prerequisites: migrated schema,
 existing ADMIN/ENLACE/OBSERVADOR roles, and an existing active ADMIN account with
 an active ADMIN role. Missing roles cause a failure without writes; this command
@@ -515,7 +516,7 @@ pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approv
 pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approved initial access" --apply
 ```
 
-The closed mapping contains exactly eighteen codes:
+The closed mapping contains exactly twenty-two codes:
 
 | Permission group  | Codes                                                                                                                                              | ADMIN     | ENLACE   | OBSERVADOR |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------- | ---------- |
@@ -523,15 +524,17 @@ The closed mapping contains exactly eighteen codes:
 | Operatives        | `operatives:read`, `operatives:create`                                                                                                             | Both      | Both     | None       |
 | Observers         | `observers:read`, `observers:create`, `observers:update`, `observers:change-status`                                                                | All four  | All four | None       |
 | Attention Modules | `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`                                | All four  | All four | None       |
+| Assignments       | `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`                                                               | All four  | All four | None       |
 
-For databases provisioned with the previous ten-code mapping, preview and explicitly
-apply the same command again. It preserves existing permission identifiers and approved
-grants, adds the eight new permissions for ADMIN/ENLACE and `operatives:create` for
-ENLACE. This does not add operative lifecycle endpoints or implicit ADMIN privileges.
+For databases provisioned with the previous eighteen-code mapping, preview and explicitly
+apply the same command again after authorization. It preserves existing permission
+identifiers and approved grants, adding four Assignments permissions for ADMIN/ENLACE.
+Upgrading older mappings also reconciles the existing operational grants. This does
+not add operative lifecycle endpoints or implicit ADMIN privileges.
 
 Grants belong to roles, so all accounts with the role receive them. Applying the
 command creates missing permission rows, adds missing approved grants and removes
-incorrect grants **within these eighteen codes and three roles only**. Other permissions,
+incorrect grants **within these twenty-two codes and three roles only**. Other permissions,
 other roles and existing descriptions are untouched. Actual changes have individual
 administrative audit events with the actor and supplied reason in one transaction;
 repeating an already-applied mapping writes nothing. The command never runs on
@@ -544,6 +547,98 @@ credential lifecycle, concurrent login/mutation races, pagination, provisioning 
 audit-failure rollback. Auth/Users/database tests also accept a dedicated synthetic MySQL
 account named `hhp_test_<16 lowercase hex digits>` instead of the development user;
 that account must be created and removed by the isolated test setup, never by the API.
+
+## Assignments backend
+
+Assignments are persistent validity periods with stable module and daily scheduled
+hours, not daily shift rows. One observer may have at most one non-cancelled period
+applicable on any date, across all operatives, even with different hours. Validity
+does **not** establish attendance obligations on every date: no weekend, holiday,
+rest-day calendar or daily attendance enforcement is included. Scheduling does not
+authorize attendance capture or change an operative's lifecycle.
+
+| Endpoint                              | Input                                                                                            | Permission / result                                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| `POST /api/assignments`               | `operativeId`, `observerId`, `attentionModuleId`, `validFrom`, `validTo`, `startTime`, `endTime` | `assignments:create`; 201                           |
+| `GET /api/assignments`                | Optional filters below                                                                           | `assignments:read`; 200                             |
+| `GET /api/assignments/:id`            | UUIDv7                                                                                           | `assignments:read`; 200 or 404                      |
+| `POST /api/assignments/:id/change`    | `effectiveFrom`, module and/or hours, `reason`, `expectedVersion`                                | `assignments:update`; 201 replacement, or 204 no-op |
+| `POST /api/assignments/:id/terminate` | `lastValidDate`, `reason`, `expectedVersion`                                                     | `assignments:update`; 204                           |
+| `POST /api/assignments/:id/cancel`    | `reason`, `expectedVersion`                                                                      | `assignments:cancel`; 204                           |
+
+All IDs are UUIDv7, validity dates are real civil `YYYY-MM-DD` values, and daily hours
+are explicit `HH:mm:ss` within the same day with start < end. Normally 09:00–17:00,
+the schedule is configurable and has no implicit database default. Dates are inclusive
+and must fit a draft or active operative. Creation (including historical periods) and
+effective rescheduling require active observers/modules; termination/cancellation do
+not require them to remain active. Effective mutations are blocked in closed operatives.
+
+Filters: `operativeId`, `observerId`, `attentionModuleId`, `from`, `to`, `applicableOn`,
+`cancelled`, `page`, `limit`. `from`/`to` select intersecting periods; `applicableOn`
+selects only non-cancelled periods containing that date. Filters combine with AND,
+so `applicableOn` plus `cancelled=true` yields no results. Without cancellation filters,
+history includes both states. Pagination defaults to 1/20 (limit <= 100), ordered by
+validity start then UUID ascending, with `{ items, page, limit, total }`.
+
+Responses expose `id`, the three reference IDs, validity dates, scheduled hours,
+`cancelledAt`, integer `version`, `createdBy`, `createdAt`, and `updatedAt`. UTC instants
+retain microseconds; civil dates/hours are not converted to UTC instants.
+
+Changes apply on a future date D in `America/Mexico_City`: close the original through
+D−1 and insert its replacement through the previous end, preserving observer/operative.
+Replacing from the beginning of a future period instead cancels that period. Module
+and schedule on previous rows remain unchanged. Other future periods are never silently
+modified. Cancel only programming starting after today; terminate started periods by
+shortening their end to today or a later date within their existing interval. There
+are no intraday/retroactive changes, extensions, physical deletion or reactivation.
+
+Reasons are nonblank and at most 500 Unicode code points. Mutations require the current
+`expectedVersion`; stale versions, incompatible periods/states and retriable lock conflicts
+return 409. Reload before retrying. Effective changes increment the affected period's
+version; a replacement starts at 1. No-ops with the current version change no timestamps,
+versions or audit. ADMIN/ENLACE require the exact permission; OBSERVADOR access awaits
+verified identity linking and ownership rules. CSRF/session guards apply unchanged.
+
+Writes lock actor authority, operative, observer, modules (sorted IDs), then assignment;
+the observer lock serializes interval checks even on an empty calendar. Changes and
+audit events commit together. Audit links predecessor/replacement IDs without copying
+personal names or phones.
+
+### Pending shared-database upgrade
+
+`0002_persistent_assignments.sql` and its Drizzle metadata replace the legacy single
+date with validity dates and a positive integer locking version. All four assignment
+FKs, cancellation marker, timestamps and audit relationships are preserved. The migration
+has an empty-table guard: it refuses to reinterpret nonempty legacy rows and prevents
+inserts between that check and the structural change. MySQL DDL is not transactionally
+reversible; inspect partial state if any migration fails. Stop application writes before
+applying it. If assignments exist, stop and approve a separate historical conversion;
+do not delete records or infer full-operative validity from a single legacy date.
+
+The shared development database is **not migrated or provisioned by this feature**.
+After separate authorization, verify the target and empty assignments table, then run:
+
+```sh
+pnpm --filter @hhpaisanos/api db:migrate
+pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approved Assignments access"
+# Review the preview, then apply only with authorization:
+pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approved Assignments access" --apply
+```
+
+Do not run the new Assignments API against the legacy schema. The migration and
+permission provisioning are independent explicit operations; neither runs on startup.
+
+### Future daily capture boundary
+
+Attendance/report tables do not exist yet. Before enabling them, records must carry
+their own civil day and reference the precise historical period: attendance uniqueness
+per assignment/day/type (plus correction version), report uniqueness per assignment/day
+(plus correction version). Validate dates under assignment locks and reject changes that
+would put associated activity outside its period; never silently move it to a replacement.
+Late capture may reference a terminated period. Actual entry/exit instants are distinct
+from scheduled hours. Working-day obligations, capture authorization and correction
+workflows require their own approved requirements; no placeholder capture implementation
+is included here.
 
 ## Git workflow
 
@@ -565,7 +660,7 @@ that account must be created and removed by the isolated test setup, never by th
 Health only reports process availability, not database or external-service
 readiness. Startup verifies MySQL connectivity and shutdown closes the pool.
 Backend authentication, permission guards, scoped account administration, observer
-profile administration and initial operative creation/consultation are implemented; other business workflows, frontend
+profile administration, attention modules, persistent assignment management and initial operative creation/consultation are implemented; other business workflows, frontend
 authentication, Telegram, deployment and CI/CD remain deferred. Persistence tables
 alone do not implement their workflows.
 
