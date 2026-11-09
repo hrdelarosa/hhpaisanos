@@ -24,10 +24,29 @@ export const approvedPermissions = [
   'permissions:read',
   'operatives:read',
   'operatives:create',
+  'observers:read',
+  'observers:create',
+  'observers:update',
+  'observers:change-status',
+  'attention-modules:read',
+  'attention-modules:create',
+  'attention-modules:update',
+  'attention-modules:change-status',
 ];
 const mappings = {
   ADMIN: approvedPermissions,
-  ENLACE: ['operatives:read'],
+  ENLACE: [
+    'operatives:read',
+    'operatives:create',
+    'observers:read',
+    'observers:create',
+    'observers:update',
+    'observers:change-status',
+    'attention-modules:read',
+    'attention-modules:create',
+    'attention-modules:update',
+    'attention-modules:change-status',
+  ],
   OBSERVADOR: [],
 };
 

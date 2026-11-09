@@ -309,8 +309,8 @@ timestamps are UTC strings with six fractional digits. Global session, mandatory
 password-change, CSRF and permission protections apply unchanged.
 
 **Permission dependency:** the Users module owns initial provisioning. Approved
-grants are ADMIN: `operatives:read` and `operatives:create`; ENLACE:
-`operatives:read`; OBSERVADOR: neither. No grants or role bypasses are introduced
+grants are ADMIN and ENLACE: `operatives:read` and `operatives:create`;
+OBSERVADOR: neither. No grants or role bypasses are introduced
 by Operatives. Use the Users-owned `users:provision-permissions` command described
 below; without provisioned grants, real accounts cannot use these endpoints.
 
@@ -366,11 +366,9 @@ Writes revalidate the actor/permission in the transaction, lock the module for e
 and commit the change and allowlisted administrative audit event atomically. Module
 locking also protects the assignment check against concurrent FK inserts.
 
-**Permission integration pending:** ADMIN and ENLACE are approved to receive all four
-permissions; OBSERVADOR receives none. This feature does not change the shared Users
-provisioning command, whose current closed ten-code mapping does not provision these
-permissions. Central provisioning must be updated separately after feature integration;
-until then, real accounts without these grants receive 403, including ADMIN. There
+**Permission dependency:** the centralized `users:provision-permissions` command grants
+all four permissions to ADMIN and ENLACE; OBSERVADOR receives none. Until explicitly
+applied, real accounts without these grants receive 403, including ADMIN. There
 are no startup grants, new migrations, automatic associations, or role-name bypasses.
 
 Integration tests create their own disposable MySQL database/user and synthetic grants,
@@ -415,10 +413,9 @@ linking/unlinking/reassignment, self-service or assignment management is exposed
 Mutations recheck authority and commit with minimal allowlisted audit events in one
 transaction; personal edits record changed field names, not personal values.
 
-**Permission dependency:** approved future grants are ADMIN/ENLACE: all four;
-OBSERVADOR: none. The shared permission provisioning command is intentionally
-unchanged in this branch. Until the separate provisioning integration is approved
-and explicitly applied, real accounts without these grants cannot use the module.
+**Permission dependency:** the centralized `users:provision-permissions` command grants
+all four permissions to ADMIN and ENLACE; OBSERVADOR receives none. Until explicitly
+applied, real accounts without these grants cannot use the module, including ADMIN.
 No schema migration or automatic grants are introduced.
 
 Integration tests use isolated synthetic MySQL databases/accounts and permissions:
@@ -484,8 +481,9 @@ are non-cacheable and never contain password hashes or session tokens.
 
 ### Explicit initial permission provisioning
 
-Users owns the single initial provisioning command, including the agreed Operatives
-codes. It does not implement Operatives endpoints. Prerequisites: migrated schema,
+Users owns the single centralized provisioning command for Users/catalog, Operatives,
+Observers and Attention Modules permissions. It does not implement operational endpoints.
+Prerequisites: migrated schema,
 existing ADMIN/ENLACE/OBSERVADOR roles, and an existing active ADMIN account with
 an active ADMIN role. Missing roles cause a failure without writes; this command
 does not create roles or accounts. The development bootstrap creates only ADMIN.
@@ -517,15 +515,23 @@ pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approv
 pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approved initial access" --apply
 ```
 
-The closed mapping contains exactly ten codes:
+The closed mapping contains exactly eighteen codes:
 
-- ADMIN: all eight Users/catalog permissions above, plus `operatives:read` and `operatives:create`.
-- ENLACE: only `operatives:read` from that set.
-- OBSERVADOR: none from that set.
+| Permission group  | Codes                                                                                                                                              | ADMIN     | ENLACE   | OBSERVADOR |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------- | ---------- |
+| Users/catalog     | `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read` | All eight | None     | None       |
+| Operatives        | `operatives:read`, `operatives:create`                                                                                                             | Both      | Both     | None       |
+| Observers         | `observers:read`, `observers:create`, `observers:update`, `observers:change-status`                                                                | All four  | All four | None       |
+| Attention Modules | `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`                                | All four  | All four | None       |
+
+For databases provisioned with the previous ten-code mapping, preview and explicitly
+apply the same command again. It preserves existing permission identifiers and approved
+grants, adds the eight new permissions for ADMIN/ENLACE and `operatives:create` for
+ENLACE. This does not add operative lifecycle endpoints or implicit ADMIN privileges.
 
 Grants belong to roles, so all accounts with the role receive them. Applying the
 command creates missing permission rows, adds missing approved grants and removes
-incorrect grants **within these ten codes and three roles only**. Other permissions,
+incorrect grants **within these eighteen codes and three roles only**. Other permissions,
 other roles and existing descriptions are untouched. Actual changes have individual
 administrative audit events with the actor and supplied reason in one transaction;
 repeating an already-applied mapping writes nothing. The command never runs on
