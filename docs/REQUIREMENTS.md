@@ -63,6 +63,17 @@ The system must support:
 
 Coordinates and location-verification settings remain optional until their operational requirements and authorization are confirmed.
 
+Confirmed initial Attention Modules backend scope:
+
+- Create, list, retrieve, edit and activate/deactivate modules within the existing Guerrero-wide scope.
+- Creation accepts only name and municipality and creates an active module. Trim surrounding whitespace, preserving casing, accents and internal spaces. Names and municipalities are required, with maximum lengths of 120 and 100 respectively. No business-key uniqueness restriction is introduced.
+- List by literal name substring, municipality equality using the database collation, and active flag; paginate with `page` and `limit` (defaults 1 and 20, maximum limit 100), ordered by creation time and UUID descending. Without an active filter, include both states.
+- Only name and municipality are editable, and effective changes are rejected whenever any assignment exists, including cancelled assignments. Repeated requests without effective changes are no-ops. Corrections and status changes require a nonblank reason of at most 500 characters.
+- Activation/deactivation changes only the module's active flag. It never modifies or cancels assignments. No deletion endpoint is exposed, and existing relationships/history are preserved.
+- Require `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, and `attention-modules:change-status` for their respective operations, without role-name bypasses. The approved future grants are ADMIN and ENLACE: all four; OBSERVADOR: none. Central permission provisioning remains a separate integration task; this branch does not change the existing closed provisioning catalog.
+- Mutations revalidate the actor and permissions under transactional locks. Module changes and administrative audit events commit atomically; no-op requests generate no events.
+- Coordinates and validation radius are neither accepted nor exposed by this API. Existing geographic values remain untouched by administrative edits.
+
 ## 5. Observers and accounts
 
 The system must support:
