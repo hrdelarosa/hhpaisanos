@@ -104,15 +104,25 @@ Each assignment identifies:
 - An operative.
 - An observer.
 - An attention module.
-- A calendar date.
-- A start time and an end time.
+- An inclusive validity period within the operative's dates.
+- Daily scheduled start and end times, normally 09:00–17:00 but configurable.
 
 Business rules:
 
-- Shifts must start and end on the same calendar day.
-- An observer may have multiple assignments on the same day only when their schedules do not overlap.
-- Cancelled assignments remain available for historical reference.
-- Assignment cancellation must not silently invalidate attendance or attention information already recorded.
+- Assignments are persistent periods, never generated separately for each day. Scheduled hours start and end within the same civil day.
+- An observer may have at most one applicable non-cancelled assignment on any calendar date across all operatives and modules, regardless of hours.
+- Validity does not establish attendance obligations for every calendar date. Weekends, holidays, rest days and daily attendance enforcement are not implemented without approved requirements.
+- Create assignments in draft or active operatives, referencing active observer profiles and active attention modules. Scheduling does not activate an operative or authorize attendance capture.
+- The initial API accepts explicit validity dates, including historical creation within an operative; changes to existing conditions are prospective only. No operative lifecycle management is added.
+- Module/schedule changes take effect on a future civil date D. Preserve the original conditions through D−1 and create a new period from D through the previous end. Operative and observer remain fixed. Replacing a whole future period cancels its previous programming and inserts a new period.
+- A change affects only the specified period, never unrelated future periods. No intraday changes, automatic extensions or retroactive rewriting are exposed.
+- Only programming whose first validity date is later than today may be cancelled completely. Started assignments use early termination, retaining at least all dates through today. The last valid date is inclusive and cannot extend the existing interval.
+- Cancelled and terminated periods remain available for history. No deletion or reactivation is exposed. Cancelled periods do not reserve dates; elapsed non-cancelled periods still do.
+- Civil-date decisions use `America/Mexico_City`; recorded instants remain UTC.
+- Require nonblank reasons up to 500 Unicode code points for change, termination and cancellation. Require the current positive integer `expectedVersion`; increment on effective modification and reject stale versions with 409. No-ops change neither version/timestamps nor audit.
+- Require explicit `assignments:read`, `assignments:create`, `assignments:update` (change/termination) and `assignments:cancel`. ADMIN and ENLACE receive all four through centralized provisioning; OBSERVADOR receives none pending verified account/profile linking and ownership rules.
+- Revalidate mutation authority under transactional locks. Serialize scheduling through the observer row and atomically commit period changes/replacements with meaningful audit events.
+- Attendance/report tables remain deferred. Before enabling capture, daily records must reference the precise historical assignment period, include their own civil date, validate applicability and coordinate assignment locks. Never shorten a period past associated activity or silently transfer historical records.
 
 ## 7. Attendance
 
@@ -128,13 +138,15 @@ The system must support:
 - Supporting review and correction while preserving history.
 - Calculating attendance status from the relevant records and shift configuration.
 
+Daily attendance will reference a persistent assignment and an explicit attendance date; actual entry/exit instants are separate from scheduled hours. Assignment validity alone does not determine whether attendance was required that day or authorize capture. Working-day rules, capture policies and identity linking remain separate decisions.
+
 The precise review states, correction rules, tolerance policies, and location requirements remain pending confirmation.
 
 ## 8. Attention reports
 
 The system must support:
 
-- A consolidated attention report associated with an assignment.
+- A daily consolidated attention report associated with an assignment and an explicit report date.
 - An official catalog of attention concepts.
 - Recording quantities by concept.
 - Supporting the concept requiring a general specification, such as "Other".
@@ -184,7 +196,7 @@ Account-management policies confirmed for the initial Users implementation:
 - Temporary passwords are securely generated server-side and returned only in the successful creation/reset response, never stored in plaintext. Delivery requires an authorized operational channel.
 - Administrative reset clears temporary login lockout, requires password change and revokes sessions without reactivating an inactive account. Deactivation and effective role changes revoke sessions; reactivation never restores them.
 - Account mutations and relevant audit events are atomic. Role-permission editing and observer profile management are not exposed through Users.
-- Permission provisioning is explicit, idempotent and audited, never automatic at startup or migration time. The approved closed set is `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read`, `operatives:read`, `operatives:create`, `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`. ADMIN receives all eighteen; ENLACE receives both Operatives permissions and all eight Observers/Attention Modules permissions; OBSERVADOR receives none of this set. Other permission mappings remain unchanged.
+- Permission provisioning is explicit, idempotent and audited, never automatic at startup or migration time. The approved closed set is `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read`, `operatives:read`, `operatives:create`, `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`, `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`. ADMIN receives all twenty-two; ENLACE receives both Operatives permissions and all twelve Observers/Attention Modules/Assignments permissions; OBSERVADOR receives none of this set. Other permission mappings remain unchanged.
 
 ## 10. Audit and traceability
 

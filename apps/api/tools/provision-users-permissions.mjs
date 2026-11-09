@@ -32,6 +32,10 @@ export const approvedPermissions = [
   'attention-modules:create',
   'attention-modules:update',
   'attention-modules:change-status',
+  'assignments:read',
+  'assignments:create',
+  'assignments:update',
+  'assignments:cancel',
 ];
 const mappings = {
   ADMIN: approvedPermissions,
@@ -46,6 +50,10 @@ const mappings = {
     'attention-modules:create',
     'attention-modules:update',
     'attention-modules:change-status',
+    'assignments:read',
+    'assignments:create',
+    'assignments:update',
+    'assignments:cancel',
   ],
   OBSERVADOR: [],
 };

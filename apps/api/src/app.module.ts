@@ -7,6 +7,7 @@ import { OperativesModule } from './modules/operatives/operatives.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { AttentionModulesModule } from './modules/attention-modules/attention-modules.module.js';
 import { ObserversModule } from './modules/observers/observers.module.js';
+import { AssignmentsModule } from './modules/assignments/assignments.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ObserversModule } from './modules/observers/observers.module.js';
     OperativesModule,
     AttentionModulesModule,
     ObserversModule,
+    AssignmentsModule,
   ],
   providers: [
     {

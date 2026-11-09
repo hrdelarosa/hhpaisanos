@@ -15,6 +15,13 @@
       "when": 1794121152844,
       "tag": "0001_operatives_name_dates_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1794201972504,
+      "tag": "0002_persistent_assignments",
+      "breakpoints": true
     }
   ]
 }
