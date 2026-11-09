@@ -57,6 +57,7 @@ apps/api/src/database/ MySQL infrastructure and API-internal Drizzle schemas
 apps/api/drizzle/     Versioned SQL migrations and Drizzle metadata
 apps/api/src/modules/auth/ Authentication, server-side sessions and permission guards
 apps/api/src/modules/users/ Account administration and read-only access catalogs
+apps/api/src/modules/observers/ Observer profile administration independent of accounts
 apps/web/src/         Single React application
 docs/                Functional requirements and proposed database model
 ```
@@ -333,6 +334,55 @@ When reusing a Compose service started from another worktree, set
 Do not start a second shared MySQL service. Tests apply migrations only to their
 disposable database and remove their database/user afterward.
 
+## Observers backend
+
+Observers manages operational profiles independently of login accounts across Guerrero.
+
+| Endpoint                          | Input                                                        | Required permission       |
+| --------------------------------- | ------------------------------------------------------------ | ------------------------- |
+| `POST /api/observers`             | `firstNames`, `lastNames`, optional nullable `phone`         | `observers:create`        |
+| `GET /api/observers`              | Optional `page`, `pageSize`, `search`, `active`, `linked`    | `observers:read`          |
+| `GET /api/observers/:id`          | UUIDv7                                                       | `observers:read`          |
+| `PATCH /api/observers/:id`        | At least one of `firstNames`, `lastNames`, `phone`; `reason` | `observers:update`        |
+| `PATCH /api/observers/:id/status` | `active`, `reason`                                           | `observers:change-status` |
+
+Creation returns 201 with an active, accountless profile; patches return 204.
+Profiles expose only `id`, `firstNames`, `lastNames`, `phone`, `active`, `userId`,
+`createdAt`, `updatedAt`. Timestamps follow Users' UTC MySQL string representation
+with six fractional digits. Names preserve supplied spelling/whitespace and allow
+1–100 Unicode code points; non-null phones allow 1–20. Neither may be whitespace-only.
+Omitted patch fields remain unchanged; explicit `phone: null` clears the phone.
+Reasons are required, nonblank and at most 500 code points. Unsupported fields are
+rejected. Identical updates preserve timestamps and generate no fictitious audit.
+
+Lists return `{ items, page, pageSize, total }`, default to page 1 / 20 items,
+allow at most 100 items per page and order by creation time then UUID ascending.
+`search` matches literal substrings in either name field; `active` and `linked`
+accept only `true` or `false`. `linked` filters existing relationships but does not
+manage them. All normal session, mandatory password-change and CSRF protections apply.
+
+Profile status is independent of account status: activation/deactivation never
+changes the linked account, its sessions or assignments. No deletion, account
+linking/unlinking/reassignment, self-service or assignment management is exposed.
+Mutations recheck authority and commit with minimal allowlisted audit events in one
+transaction; personal edits record changed field names, not personal values.
+
+**Permission dependency:** approved future grants are ADMIN/ENLACE: all four;
+OBSERVADOR: none. The shared permission provisioning command is intentionally
+unchanged in this branch. Until the separate provisioning integration is approved
+and explicitly applied, real accounts without these grants cannot use the module.
+No schema migration or automatic grants are introduced.
+
+Integration tests use isolated synthetic MySQL databases/accounts and permissions:
+
+```sh
+pnpm --filter @hhpaisanos/api build
+pnpm --filter @hhpaisanos/api exec vp test run test/observers.integration.test.mjs --no-file-parallelism --testTimeout 30000
+```
+
+When sharing the existing Compose service across worktrees, set
+`COMPOSE_PROJECT_NAME=hhpaisanos`; do not start another MySQL container.
+
 ## Backend user administration
 
 Users operates within the single Guerrero scope. Every endpoint requires both an
@@ -460,8 +510,8 @@ that account must be created and removed by the isolated test setup, never by th
 
 Health only reports process availability, not database or external-service
 readiness. Startup verifies MySQL connectivity and shutdown closes the pool.
-Backend authentication, permission guards, scoped account administration and initial
-operative creation/consultation are implemented; other business workflows, frontend
+Backend authentication, permission guards, scoped account administration, observer
+profile administration and initial operative creation/consultation are implemented; other business workflows, frontend
 authentication, Telegram, deployment and CI/CD remain deferred. Persistence tables
 alone do not implement their workflows.
 
