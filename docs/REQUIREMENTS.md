@@ -47,7 +47,7 @@ Confirmed initial backend scope:
 - Creation accepts only name, start date, and end date; the initial status is always `borrador`.
 - Dates are real civil calendar dates with start date less than or equal to end date. Overlapping operative intervals are allowed.
 - Trim leading/trailing name whitespace, preserving casing, accents and internal whitespace. Equivalent names under the existing database column collation and identical start/end dates are duplicates.
-- Require `operatives:read` for listing/details and `operatives:create` for creation, without role-name bypasses. The approved initial grants are ADMIN: both; ENLACE: read; OBSERVADOR: neither. Initial permission provisioning belongs to the Users module.
+- Require `operatives:read` for listing/details and `operatives:create` for creation, without role-name bypasses. The approved grants are ADMIN and ENLACE: both; OBSERVADOR: neither. Explicit centralized permission provisioning belongs to the Users module.
 - Creation and its administrative audit event commit atomically.
 - Editing, status transitions, activation, closing, reopening and deletion are not exposed in the initial release. Modification and reopening policies remain pending.
 
@@ -70,7 +70,7 @@ Confirmed initial Attention Modules backend scope:
 - List by literal name substring, municipality equality using the database collation, and active flag; paginate with `page` and `limit` (defaults 1 and 20, maximum limit 100), ordered by creation time and UUID descending. Without an active filter, include both states.
 - Only name and municipality are editable, and effective changes are rejected whenever any assignment exists, including cancelled assignments. Repeated requests without effective changes are no-ops. Corrections and status changes require a nonblank reason of at most 500 characters.
 - Activation/deactivation changes only the module's active flag. It never modifies or cancels assignments. No deletion endpoint is exposed, and existing relationships/history are preserved.
-- Require `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, and `attention-modules:change-status` for their respective operations, without role-name bypasses. The approved future grants are ADMIN and ENLACE: all four; OBSERVADOR: none. Central permission provisioning remains a separate integration task; this branch does not change the existing closed provisioning catalog.
+- Require `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, and `attention-modules:change-status` for their respective operations, without role-name bypasses. The approved grants are ADMIN and ENLACE: all four; OBSERVADOR: none. These permissions belong to the explicit centralized provisioning catalog.
 - Mutations revalidate the actor and permissions under transactional locks. Module changes and administrative audit events commit atomically; no-op requests generate no events.
 - Coordinates and validation radius are neither accepted nor exposed by this API. Existing geographic values remain untouched by administrative edits.
 
@@ -93,7 +93,7 @@ Confirmed initial Observers backend scope:
 - Profiles are created active and without an account. Editable fields are first names, last names and optional phone; explicit null clears the phone. Preserve supplied spelling and whitespace; names and non-null phones must not be blank. Names allow at most 100 Unicode code points each and phones 20.
 - Profile edits require at least one editable field and a nonblank reason (up to 500 code points). Status changes require a boolean and the same reason contract. Identical updates are no-ops without audit events.
 - Profile activation/deactivation never modifies the linked account, its sessions or historical relationships. No physical deletion is exposed.
-- Require explicit `observers:read`, `observers:create`, `observers:update` and `observers:change-status` permissions, without role-name bypasses. Approved future grants: ADMIN and ENLACE receive all four; OBSERVADOR receives none. Provisioning integration is deferred; the existing closed permission command is unchanged.
+- Require explicit `observers:read`, `observers:create`, `observers:update` and `observers:change-status` permissions, without role-name bypasses. Approved grants: ADMIN and ENLACE receive all four; OBSERVADOR receives none. These permissions belong to the explicit centralized provisioning catalog.
 - Mutations revalidate current authority transactionally and commit atomically with audit. Personal edits audit changed field names rather than copies of names or phones.
 - Account linking, unlinking, reassignment, self-service and assignment workflows are not exposed by this module.
 
@@ -184,7 +184,7 @@ Account-management policies confirmed for the initial Users implementation:
 - Temporary passwords are securely generated server-side and returned only in the successful creation/reset response, never stored in plaintext. Delivery requires an authorized operational channel.
 - Administrative reset clears temporary login lockout, requires password change and revokes sessions without reactivating an inactive account. Deactivation and effective role changes revoke sessions; reactivation never restores them.
 - Account mutations and relevant audit events are atomic. Role-permission editing and observer profile management are not exposed through Users.
-- Permission provisioning is explicit, idempotent and audited, never automatic at startup or migration time. The approved closed set is `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read`, `operatives:read`, `operatives:create`. ADMIN receives all ten; ENLACE receives only `operatives:read`; OBSERVADOR receives none of this set. Other permission mappings remain unchanged.
+- Permission provisioning is explicit, idempotent and audited, never automatic at startup or migration time. The approved closed set is `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read`, `operatives:read`, `operatives:create`, `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`. ADMIN receives all eighteen; ENLACE receives both Operatives permissions and all eight Observers/Attention Modules permissions; OBSERVADOR receives none of this set. Other permission mappings remain unchanged.
 
 ## 10. Audit and traceability
 
