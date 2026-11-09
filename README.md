@@ -334,6 +334,54 @@ When reusing a Compose service started from another worktree, set
 Do not start a second shared MySQL service. Tests apply migrations only to their
 disposable database and remove their database/user afterward.
 
+## Attention Modules backend
+
+The Guerrero-wide API exposes:
+
+| Endpoint                                  | Permission                        | Behavior                                                                    |
+| ----------------------------------------- | --------------------------------- | --------------------------------------------------------------------------- |
+| `POST /api/attention-modules`             | `attention-modules:create`        | Accepts only `name` and `municipality`; creates an active module            |
+| `GET /api/attention-modules`              | `attention-modules:read`          | Filters by `name`, `municipality`, `active`; paginates with `page`, `limit` |
+| `GET /api/attention-modules/:id`          | `attention-modules:read`          | Retrieves a UUIDv7 module, or 404                                           |
+| `PATCH /api/attention-modules/:id`        | `attention-modules:update`        | Accepts `name` and/or `municipality`, plus required `reason`; returns 204   |
+| `PATCH /api/attention-modules/:id/status` | `attention-modules:change-status` | Accepts boolean `active` and required `reason`; returns 204                 |
+
+Names and municipalities are required on creation, trimmed only at their boundaries,
+and limited to 120 and 100 characters. There is no uniqueness rule. Updates reject
+nulls and require at least one editable field. Reasons must be nonblank and at most
+500 characters. Effective name/municipality edits return 409 if any assignment exists,
+including cancelled assignments. Status changes never alter assignments. Repeated
+values are no-ops: no timestamp change or fictitious audit event. No deletion is exposed.
+
+Name search is a literal substring; municipality uses equality under the existing
+database collation. `active` accepts only `true` or `false`; omitting it includes both
+states. Pagination defaults to page 1 / limit 20 (maximum 100), ordered by creation
+time then UUID descending. Lists return `{ items, page, limit, total }`. Records expose
+only `id`, `name`, `municipality`, `active`, `createdAt`, `updatedAt`, with UTC timestamps
+preserving six fractional digits. Geographic coordinates and validation radius are
+not accepted or exposed, and existing values are preserved.
+
+Global session, mandatory password-change, CSRF and permission guards apply unchanged.
+Writes revalidate the actor/permission in the transaction, lock the module for edits,
+and commit the change and allowlisted administrative audit event atomically. Module
+locking also protects the assignment check against concurrent FK inserts.
+
+**Permission integration pending:** ADMIN and ENLACE are approved to receive all four
+permissions; OBSERVADOR receives none. This feature does not change the shared Users
+provisioning command, whose current closed ten-code mapping does not provision these
+permissions. Central provisioning must be updated separately after feature integration;
+until then, real accounts without these grants receive 403, including ADMIN. There
+are no startup grants, new migrations, automatic associations, or role-name bypasses.
+
+Integration tests create their own disposable MySQL database/user and synthetic grants,
+reusing the running Compose service rather than starting another container:
+
+```sh
+pnpm --filter @hhpaisanos/api build
+# Set COMPOSE_PROJECT_NAME to the existing service project when using another worktree.
+pnpm --filter @hhpaisanos/api exec vp test run test/attention-modules.integration.test.mjs --no-file-parallelism --testTimeout 30000
+```
+
 ## Observers backend
 
 Observers manages operational profiles independently of login accounts across Guerrero.
