@@ -385,13 +385,15 @@ pnpm --filter @hhpaisanos/api exec vp test run test/attention-modules.integratio
 
 Observers manages operational profiles independently of login accounts across Guerrero.
 
-| Endpoint                          | Input                                                        | Required permission       |
-| --------------------------------- | ------------------------------------------------------------ | ------------------------- |
-| `POST /api/observers`             | `firstNames`, `lastNames`, optional nullable `phone`         | `observers:create`        |
-| `GET /api/observers`              | Optional `page`, `pageSize`, `search`, `active`, `linked`    | `observers:read`          |
-| `GET /api/observers/:id`          | UUIDv7                                                       | `observers:read`          |
-| `PATCH /api/observers/:id`        | At least one of `firstNames`, `lastNames`, `phone`; `reason` | `observers:update`        |
-| `PATCH /api/observers/:id/status` | `active`, `reason`                                           | `observers:change-status` |
+| Endpoint                              | Input                                                        | Required permission       |
+| ------------------------------------- | ------------------------------------------------------------ | ------------------------- |
+| `POST /api/observers`                 | `firstNames`, `lastNames`, optional nullable `phone`         | `observers:create`        |
+| `GET /api/observers`                  | Optional `page`, `pageSize`, `search`, `active`, `linked`    | `observers:read`          |
+| `GET /api/observers/:id`              | UUIDv7                                                       | `observers:read`          |
+| `PATCH /api/observers/:id`            | At least one of `firstNames`, `lastNames`, `phone`; `reason` | `observers:update`        |
+| `PATCH /api/observers/:id/status`     | `active`, `reason`                                           | `observers:change-status` |
+| `GET /api/observers/linkable-account` | Required exact `username`                                    | `observers:link-account`  |
+| `PUT /api/observers/:id/account`      | `userId`, `verificationMethod`, `reason`                     | `observers:link-account`  |
 
 Creation returns 201 with an active, accountless profile; patches return 204.
 Profiles expose only `id`, `firstNames`, `lastNames`, `phone`, `active`, `userId`,
@@ -410,14 +412,49 @@ manage them. All normal session, mandatory password-change and CSRF protections 
 
 Profile status is independent of account status: activation/deactivation never
 changes the linked account, its sessions or assignments. No deletion, account
-linking/unlinking/reassignment, self-service or assignment management is exposed.
+unlinking/reassignment, self-service or assignment management is exposed.
 Mutations recheck authority and commit with minimal allowlisted audit events in one
 transaction; personal edits record changed field names, not personal values.
 
 **Permission dependency:** the centralized `users:provision-permissions` command grants
-all four permissions to ADMIN and ENLACE; OBSERVADOR receives none. Until explicitly
+all five permissions to ADMIN and ENLACE; OBSERVADOR receives none. Until explicitly
 applied, real accounts without these grants cannot use the module, including ADMIN.
 No schema migration or automatic grants are introduced.
+
+### Supervised account linking
+
+Only an operator with `observers:link-account` may look up an exact username or
+link a profile. Lookup returns only `{ id, username, fullName }`; absent and
+ineligible accounts return the same 404. Username matching is byte-exact, without
+trimming or case/accent folding. No general Users access is granted to ENLACE.
+
+Before submitting `{ userId, verificationMethod: "supervised_administrative", reason }`,
+the authorized ADMIN/ENLACE must verify identity using an institutionally approved
+procedure, witness the observer independently signing in with definitive credentials,
+and confirm the exact profile/account pairing. **The method is an operator attestation,
+not cryptographic proof of consent.** Do not request passwords, copy identity documents,
+or use matching names, phones or UUIDs as identity evidence. Reasons must not contain
+credentials, document numbers or unnecessary personal information.
+
+New links require an active account, active OBSERVADOR role, no required password
+change or current login lockout, and an active accountless profile. An account cannot
+already belong to any other profile, including an inactive one. No assignment is required.
+The transaction revalidates authority and eligibility under account-before-profile locks,
+creates the link, revokes existing target-account sessions (new login required), and
+records `observers.account.linked` with actor/session, reason, previous null user ID,
+new user ID and verification method. Audit failure rolls everything back.
+
+PUT returns 204. Conflicts return 409; links are never replaced. Repeating an identical
+pair with existing linking evidence returns 204 without changing timestamps, audit or
+sessions, even if the profile/account has since been suspended. Legacy links without
+that evidence remain untouched and return 409, not a new verification certificate.
+Their regularization needs a separately approved process.
+
+No migration is needed: the nullable unique account FK already enforces 1:1. Future
+personal capture must resolve identity from the authenticated user, check evidence for
+the current pair and current profile status, and authorize assignment ownership within
+the write transaction. A supplied `observerId` is not proof of identity. This feature
+does not enable capture, unlinking, reassignment, self-service or Telegram linking.
 
 Integration tests use isolated synthetic MySQL databases/accounts and permissions:
 
@@ -516,25 +553,25 @@ pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approv
 pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approved initial access" --apply
 ```
 
-The closed mapping contains exactly twenty-two codes:
+The closed mapping contains exactly twenty-three codes:
 
 | Permission group  | Codes                                                                                                                                              | ADMIN     | ENLACE   | OBSERVADOR |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------- | ---------- |
 | Users/catalog     | `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read` | All eight | None     | None       |
 | Operatives        | `operatives:read`, `operatives:create`                                                                                                             | Both      | Both     | None       |
-| Observers         | `observers:read`, `observers:create`, `observers:update`, `observers:change-status`                                                                | All four  | All four | None       |
+| Observers         | `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `observers:link-account`                                      | All five  | All five | None       |
 | Attention Modules | `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`                                | All four  | All four | None       |
 | Assignments       | `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`                                                               | All four  | All four | None       |
 
-For databases provisioned with the previous eighteen-code mapping, preview and explicitly
-apply the same command again after authorization. It preserves existing permission
-identifiers and approved grants, adding four Assignments permissions for ADMIN/ENLACE.
+For databases provisioned with the previous twenty-two-code mapping, preview and explicitly
+apply the same command again after separate authorization. It preserves existing permission
+identifiers and approved grants, adding `observers:link-account` for ADMIN/ENLACE.
 Upgrading older mappings also reconciles the existing operational grants. This does
 not add operative lifecycle endpoints or implicit ADMIN privileges.
 
 Grants belong to roles, so all accounts with the role receive them. Applying the
 command creates missing permission rows, adds missing approved grants and removes
-incorrect grants **within these twenty-two codes and three roles only**. Other permissions,
+incorrect grants **within these twenty-three codes and three roles only**. Other permissions,
 other roles and existing descriptions are untouched. Actual changes have individual
 administrative audit events with the actor and supplied reason in one transaction;
 repeating an already-applied mapping writes nothing. The command never runs on
