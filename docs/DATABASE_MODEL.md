@@ -89,7 +89,7 @@ Use an explicit allowlist for auditable fields. **Never log passwords, hashes, t
 ### `observadores`
 `id`; `nombres VARCHAR(100)`; `apellidos VARCHAR(100)`; `telefono VARCHAR(20) NULL`; `usuario_id FK usuarios NULL UNIQUE`; `activo BOOLEAN`; timestamps.
 
-A person can participate in an operative without credentials, for authorized manual entry. Accounts are linked explicitly. The prior no-reassignment rule should be confirmed in requirements before it becomes permanent.
+A person can participate in an operative without credentials, for authorized manual entry. Accounts are linked explicitly through supervised administrative verification (see REQUIREMENTS section 5). The existing nullable unique FK enforces 1:1 without another migration. Link creation and session revocation commit with an audit event containing the exact user ID and verification method; audit evidence is required to recognize verified identical retries. Legacy links are not automatically certified. Unlinking and reassignment remain deferred, not permanently prohibited.
 
 ### `operativos`
 `id`; `nombre VARCHAR(120)`; `fecha_inicio DATE`; `fecha_fin DATE`; `estado VARCHAR(20)` (`borrador`, `activo`, `cerrado`); `tolerancia_minutos SMALLINT UNSIGNED NULL`; `precision_maxima_m SMALLINT UNSIGNED NULL`; timestamps. Check `fecha_inicio <= fecha_fin`.

@@ -1,18 +1,20 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { and, asc, count, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
-import { auditoria, observadores } from '../../database/schema/index.js';
+import { auditoria, observadores, roles, usuarios } from '../../database/schema/index.js';
 import { AuthService } from '../auth/auth.service.js';
 import type { AuthContext } from '../auth/auth.types.js';
 import type { CreateObserverDto } from './dto/create-observer.dto.js';
 import type { UpdateObserverDto } from './dto/update-observer.dto.js';
 import type { ChangeObserverStatusDto } from './dto/change-observer-status.dto.js';
 import type { ListObserversQueryDto } from './dto/list-observers-query.dto.js';
+import type { LinkObserverAccountDto } from './dto/link-observer-account.dto.js';
 
 type Transaction = Parameters<Parameters<DatabaseService['db']['transaction']>[0]>[0];
 const projection = {
@@ -60,6 +62,131 @@ export class ObserversService {
       valoresAnteriores: before,
       valoresNuevos: after,
     });
+  }
+
+  async linkableAccount(username: string) {
+    const [account] = await this.database.db
+      .select({
+        id: usuarios.id,
+        username: usuarios.nombreUsuario,
+        fullName: usuarios.nombreCompleto,
+      })
+      .from(usuarios)
+      .innerJoin(roles, eq(usuarios.rolId, roles.id))
+      .leftJoin(observadores, eq(observadores.usuarioId, usuarios.id))
+      .where(
+        and(
+          // Usernames are immutable credentials: do not match collation-equivalent spellings.
+          sql`BINARY ${usuarios.nombreUsuario} = BINARY ${username}`,
+          eq(usuarios.activo, true),
+          eq(roles.activo, true),
+          eq(roles.codigo, 'OBSERVADOR'),
+          eq(usuarios.debeCambiarPassword, false),
+          or(isNull(usuarios.bloqueadoHasta), sql`${usuarios.bloqueadoHasta} <= UTC_TIMESTAMP(6)`),
+          isNull(observadores.id),
+        ),
+      );
+    if (!account) throw new NotFoundException('Eligible account not found');
+    return account;
+  }
+
+  async linkAccount(context: AuthContext, id: string, input: LinkObserverAccountDto) {
+    try {
+      await this.database.db.transaction(async (tx) => {
+        const current = await this.authorize(tx, context, 'observers:link-account');
+        // Match Users' account-before-profile order, also serializing login/reset/role changes.
+        const [account] = await tx
+          .select()
+          .from(usuarios)
+          .where(eq(usuarios.id, input.userId))
+          .for('update');
+        if (!account) throw new NotFoundException('Eligible account not found');
+        const [role] = await tx
+          .select()
+          .from(roles)
+          .where(eq(roles.id, account.rolId))
+          .for('share');
+        const [observer] = await tx
+          .select()
+          .from(observadores)
+          .where(eq(observadores.id, id))
+          .for('update');
+        if (!observer) throw new NotFoundException('Observer not found');
+        if (observer.usuarioId === account.id) {
+          const [evidence] = await tx
+            .select({ id: auditoria.id })
+            .from(auditoria)
+            .where(
+              and(
+                eq(auditoria.tipoEntidad, 'observadores'),
+                eq(auditoria.entidadId, id),
+                eq(auditoria.accion, 'observers.account.linked'),
+                sql`JSON_UNQUOTE(JSON_EXTRACT(${auditoria.valoresNuevos}, '$.userId')) = ${account.id}`,
+                sql`JSON_UNQUOTE(JSON_EXTRACT(${auditoria.valoresNuevos}, '$.verificationMethod')) = 'supervised_administrative'`,
+              ),
+            )
+            .limit(1)
+            .for('share');
+          if (!evidence)
+            throw new ConflictException('Existing link requires separate verification');
+          return;
+        }
+        if (observer.usuarioId !== null) throw new ConflictException('Observer already linked');
+        const [linked] = await tx
+          .select({ id: observadores.id })
+          .from(observadores)
+          .where(eq(observadores.usuarioId, account.id))
+          .for('update');
+        const [{ now }] = await tx
+          .select({ now: sql<string>`UTC_TIMESTAMP(6)` })
+          .from(sql`(SELECT 1) AS clock`);
+        if (
+          linked ||
+          !observer.activo ||
+          !account.activo ||
+          !role?.activo ||
+          role.codigo !== 'OBSERVADOR' ||
+          account.debeCambiarPassword ||
+          (account.bloqueadoHasta !== null && account.bloqueadoHasta > now)
+        )
+          throw new ConflictException('Account or observer is not eligible for linking');
+        const [result] = await tx
+          .update(observadores)
+          .set({ usuarioId: account.id })
+          .where(and(eq(observadores.id, id), isNull(observadores.usuarioId)));
+        if (result.affectedRows !== 1) throw new ConflictException('Observer already linked');
+        await this.auth.revokeUserSessions(
+          tx,
+          account.id,
+          current.user.id,
+          now,
+          'observer_account_linked',
+        );
+        await this.audit(
+          tx,
+          current,
+          id,
+          'observers.account.linked',
+          input.reason,
+          { userId: null },
+          { userId: account.id, verificationMethod: input.verificationMethod },
+        );
+      });
+    } catch (error) {
+      const driver = error instanceof Error && error.cause ? error.cause : error;
+      if (typeof driver === 'object' && driver !== null && 'code' in driver) {
+        if (driver.code === 'ER_LOCK_DEADLOCK' || driver.code === 'ER_LOCK_WAIT_TIMEOUT')
+          throw new ConflictException('Concurrent linking operation; reload and retry');
+        if (
+          driver.code === 'ER_DUP_ENTRY' &&
+          'sqlMessage' in driver &&
+          typeof driver.sqlMessage === 'string' &&
+          driver.sqlMessage.includes('observadores_usuario_id_unique')
+        )
+          throw new ConflictException('Account already linked');
+      }
+      throw error;
+    }
   }
 
   async create(context: AuthContext, input: CreateObserverDto) {

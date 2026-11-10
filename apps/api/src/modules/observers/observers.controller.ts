@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
 } from '@nestjs/common';
@@ -18,6 +19,8 @@ import { ChangeObserverStatusDto } from './dto/change-observer-status.dto.js';
 import { ListObserversQueryDto } from './dto/list-observers-query.dto.js';
 import { ObserverIdParamDto } from './dto/observer-id-param.dto.js';
 import { ObserversService } from './observers.service.js';
+import { LinkObserverAccountDto } from './dto/link-observer-account.dto.js';
+import { LinkableAccountQueryDto } from './dto/linkable-account-query.dto.js';
 
 @Controller('api/observers')
 export class ObserversController {
@@ -35,6 +38,25 @@ export class ObserversController {
   @Header('Cache-Control', 'no-store')
   list(@Query() query: ListObserversQueryDto) {
     return this.observers.list(query);
+  }
+
+  @Get('linkable-account')
+  @RequirePermissions('observers:link-account')
+  @Header('Cache-Control', 'no-store')
+  linkableAccount(@Query() query: LinkableAccountQueryDto) {
+    return this.observers.linkableAccount(query.username);
+  }
+
+  @Put(':id/account')
+  @RequirePermissions('observers:link-account')
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(204)
+  linkAccount(
+    @Req() request: AuthRequest,
+    @Param() params: ObserverIdParamDto,
+    @Body() input: LinkObserverAccountDto,
+  ) {
+    return this.observers.linkAccount(request.auth!, params.id, input);
   }
 
   @Get(':id')

@@ -23,6 +23,7 @@ const permissions = [
   'observers:create',
   'observers:update',
   'observers:change-status',
+  'observers:link-account',
 ];
 const envKeys = [
   'DB_HOST',
@@ -132,7 +133,7 @@ async function account(role, mustChangePassword = false) {
     body: JSON.stringify({ username, password }),
   });
   expect(response.status).toBe(200);
-  return { id, cookie: response.headers.get('set-cookie').split(';')[0] };
+  return { id, username, cookie: response.headers.get('set-cookie').split(';')[0] };
 }
 function request(path = '', { method = 'GET', cookie = admin.cookie, body, csrf = true } = {}) {
   return fetch(`${baseUrl}/api/observers${path}`, {
@@ -395,9 +396,292 @@ it('rejects invalid input and unsupported operations without modifying profiles'
         body: { userId: observer.id, reason: 'Unsupported' },
       })
     ).status,
-  ).toBe(404);
+  ).toBe(400);
   expect(await (await request(`/${profile.id}`)).json()).toEqual(profile);
   expect(await events(profile.id)).toHaveLength(1);
+});
+
+const linkInput = (userId) => ({
+  userId,
+  verificationMethod: 'supervised_administrative',
+  reason: 'Synthetic supervised verification',
+});
+const link = (id, userId, options = {}) =>
+  request(`/${id}/account`, { method: 'PUT', body: linkInput(userId), ...options });
+
+it('links verified pairs for ADMIN and ENLACE, revokes sessions and preserves idempotency and assignments', async () => {
+  for (const operator of [admin, enlace]) {
+    const target = await account('OBSERVADOR');
+    const profile = await (await create()).json();
+    const [{ id: operativeId }] = await db
+      .insert(t.operativos)
+      .values({
+        nombre: `Link history ${profile.id}`,
+        fechaInicio: '2026-12-01',
+        fechaFin: '2026-12-31',
+        estado: 'borrador',
+      })
+      .$returningId();
+    const [{ id: moduleId }] = await db
+      .insert(t.modulosAtencion)
+      .values({ nombre: 'Link module', municipio: 'Synthetic', activo: true })
+      .$returningId();
+    await db.insert(t.asignaciones).values({
+      operativoId: operativeId,
+      observadorId: profile.id,
+      moduloId: moduleId,
+      vigenteDesde: '2026-12-01',
+      vigenteHasta: '2026-12-31',
+      horaInicio: '09:00:00',
+      horaFin: '17:00:00',
+      creadoPor: admin.id,
+    });
+    const history = await db
+      .select()
+      .from(t.asignaciones)
+      .where(eq(t.asignaciones.observadorId, profile.id));
+    const lookup = await request(
+      `/linkable-account?username=${encodeURIComponent(target.username)}`,
+      { cookie: operator.cookie },
+    );
+    expect(lookup.status).toBe(200);
+    expect(await lookup.json()).toEqual({
+      id: target.id,
+      username: target.username,
+      fullName: 'Synthetic person',
+    });
+    expect((await link(profile.id, target.id, { cookie: operator.cookie })).status).toBe(204);
+    const [event] = (await events(profile.id)).filter(
+      (e) => e.accion === 'observers.account.linked',
+    );
+    expect(event).toMatchObject({
+      usuarioId: operator.id,
+      sesionId: expect.any(String),
+      valoresAnteriores: { userId: null },
+      valoresNuevos: { userId: target.id, verificationMethod: 'supervised_administrative' },
+      motivo: linkInput(target.id).reason,
+    });
+    expect(
+      (await fetch(`${baseUrl}/api/auth/me`, { headers: { Cookie: target.cookie } })).status,
+    ).toBe(401);
+    const before = await events(profile.id);
+    const sessions = await db.select().from(t.sesiones).where(eq(t.sesiones.usuarioId, target.id));
+    expect(
+      sessions.every((s) => s.revocadaEn && s.motivoRevocacion === 'observer_account_linked'),
+    ).toBe(true);
+    expect((await link(profile.id, target.id, { cookie: operator.cookie })).status).toBe(204);
+    expect(await events(profile.id)).toEqual(before);
+    expect(await db.select().from(t.sesiones).where(eq(t.sesiones.usuarioId, target.id))).toEqual(
+      sessions,
+    );
+    expect(
+      await db.select().from(t.asignaciones).where(eq(t.asignaciones.observadorId, profile.id)),
+    ).toEqual(history);
+    expect((await request(`/linkable-account?username=${target.username}`)).status).toBe(404);
+  }
+});
+
+it('rejects ineligible accounts/profiles, conflicting and legacy links without certifying them', async () => {
+  for (const change of [
+    { activo: false },
+    { debeCambiarPassword: true },
+    { bloqueadoHasta: '2099-01-01 00:00:00.000000' },
+    { rolId: roleIds.ENLACE },
+    { rolId: roleIds.ADMIN },
+  ]) {
+    const target = await account('OBSERVADOR');
+    await db.update(t.usuarios).set(change).where(eq(t.usuarios.id, target.id));
+    const profile = await (await create()).json();
+    expect((await link(profile.id, target.id)).status).toBe(409);
+    expect((await request(`/linkable-account?username=${target.username}`)).status).toBe(404);
+    expect(await events(profile.id)).toHaveLength(1);
+  }
+  const target = await account('OBSERVADOR');
+  const profile = await (await create()).json();
+  await db.update(t.roles).set({ activo: false }).where(eq(t.roles.id, roleIds.OBSERVADOR));
+  try {
+    expect((await link(profile.id, target.id)).status).toBe(409);
+  } finally {
+    await db.update(t.roles).set({ activo: true }).where(eq(t.roles.id, roleIds.OBSERVADOR));
+  }
+  await db.update(t.observadores).set({ activo: false }).where(eq(t.observadores.id, profile.id));
+  expect((await link(profile.id, target.id)).status).toBe(409);
+  await db
+    .update(t.observadores)
+    .set({ activo: true, usuarioId: target.id })
+    .where(eq(t.observadores.id, profile.id));
+  const before = await events(profile.id);
+  expect((await link(profile.id, target.id)).status).toBe(409);
+  expect((await link(profile.id, (await account('OBSERVADOR')).id)).status).toBe(409);
+  expect((await link((await (await create()).json()).id, target.id)).status).toBe(409);
+  expect(await events(profile.id)).toEqual(before);
+  expect((await link(v7(), target.id)).status).toBe(404);
+  expect((await link(profile.id, v7())).status).toBe(404);
+});
+
+it('serializes account and profile linking across different authorized actors', async () => {
+  for (const sameAccount of [true, false]) {
+    const targets = [await account('OBSERVADOR'), await account('OBSERVADOR')];
+    const profiles = [await (await create()).json(), await (await create()).json()];
+    const results = await Promise.all([
+      link(profiles[0].id, targets[0].id),
+      link(profiles[sameAccount ? 1 : 0].id, targets[sameAccount ? 0 : 1].id, {
+        cookie: enlace.cookie,
+      }),
+    ]);
+    expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([204, 409]);
+    const audits = [...(await events(profiles[0].id)), ...(await events(profiles[1].id))].filter(
+      (e) => e.accion === 'observers.account.linked',
+    );
+    expect(audits).toHaveLength(1);
+  }
+});
+
+it('rechecks target eligibility after waiting for account and profile changes', async () => {
+  for (const change of ['account-status', 'role', 'password-reset', 'profile-status']) {
+    const target = await account('OBSERVADOR');
+    const profile = await (await create()).json();
+    const table = change === 'profile-status' ? t.observadores : t.usuarios;
+    const id = change === 'profile-status' ? profile.id : target.id;
+    const tableName = change === 'profile-status' ? 'observadores' : 'usuarios';
+    const locked = Promise.withResolvers(),
+      release = Promise.withResolvers();
+    const mutation = db.transaction(async (tx) => {
+      await tx.select({ id: table.id }).from(table).where(eq(table.id, id)).for('update');
+      locked.resolve();
+      await release.promise;
+      if (change === 'role')
+        await tx.update(t.usuarios).set({ rolId: roleIds.ENLACE }).where(eq(t.usuarios.id, id));
+      else if (change === 'password-reset')
+        await tx.update(t.usuarios).set({ debeCambiarPassword: true }).where(eq(t.usuarios.id, id));
+      else await tx.update(table).set({ activo: false }).where(eq(table.id, id));
+    });
+    let pending;
+    try {
+      await locked.promise;
+      pending = link(profile.id, target.id);
+      await expect
+        .poll(
+          () =>
+            rootSql(
+              `SELECT COUNT(*) FROM performance_schema.data_lock_waits w JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.BLOCKING_ENGINE_LOCK_ID WHERE l.OBJECT_SCHEMA = '${database}' AND l.OBJECT_NAME = '${tableName}';`,
+            ),
+          { timeout: 10000 },
+        )
+        .not.toBe('0');
+    } finally {
+      release.resolve();
+      await mutation;
+    }
+    expect((await pending).status).toBe(409);
+    expect((await (await request(`/${profile.id}`)).json()).userId).toBeNull();
+    expect(
+      (await events(profile.id)).filter((e) => e.accion === 'observers.account.linked'),
+    ).toEqual([]);
+  }
+});
+
+it('rejects revoked actor sessions transactionally and makes verified duplicate requests idempotent', async () => {
+  const actor = await account('ENLACE');
+  const target = await account('OBSERVADOR');
+  const profile = await (await create()).json();
+  const auth = app.get(AuthService);
+  const context = await auth.authenticate({ headers: { cookie: actor.cookie } });
+  await auth.logout({ headers: { cookie: actor.cookie } });
+  await expect(
+    app.get(ObserversService).linkAccount(context, profile.id, linkInput(target.id)),
+  ).rejects.toMatchObject({ status: 401 });
+  const attempts = await Promise.all([
+    link(profile.id, target.id),
+    link(profile.id, target.id, { cookie: enlace.cookie }),
+  ]);
+  expect(attempts.map((r) => r.status)).toEqual([204, 204]);
+  expect(
+    (await events(profile.id)).filter((e) => e.accion === 'observers.account.linked'),
+  ).toHaveLength(1);
+  const before = await (await request(`/${profile.id}`)).json();
+  const audits = await events(profile.id);
+  await db.update(t.usuarios).set({ activo: false }).where(eq(t.usuarios.id, target.id));
+  expect((await link(profile.id, target.id)).status).toBe(204);
+  expect(await (await request(`/${profile.id}`)).json()).toEqual(before);
+  expect(await events(profile.id)).toEqual(audits);
+});
+
+it('validates linking DTOs and exact lookups and preserves Users administration boundaries', async () => {
+  const target = await account('OBSERVADOR');
+  const profile = await (await create()).json();
+  for (const body of [
+    {},
+    { ...linkInput(target.id), userId: 'bad' },
+    { ...linkInput(target.id), verificationMethod: 'name_match' },
+    { ...linkInput(target.id), reason: ' ' },
+    { ...linkInput(target.id), reason: 'x'.repeat(501) },
+    { ...linkInput(target.id), password: 'never accepted' },
+  ])
+    expect((await request(`/${profile.id}/account`, { method: 'PUT', body })).status).toBe(400);
+  for (const query of ['', '?username=', '?username=x&extra=1', '?username=x&username=y'])
+    expect((await request(`/linkable-account${query}`)).status).toBe(400);
+  expect(
+    (await request(`/linkable-account?username=${target.username.toUpperCase()}`)).status,
+  ).toBe(404);
+  expect((await fetch(`${baseUrl}/api/users`, { headers: { Cookie: enlace.cookie } })).status).toBe(
+    403,
+  );
+  for (const cookie of ['', observer.cookie, temporary.cookie]) {
+    const expected = cookie ? 403 : 401;
+    expect((await link(profile.id, target.id, { cookie })).status).toBe(expected);
+    expect(
+      (await request(`/linkable-account?username=${target.username}`, { cookie })).status,
+    ).toBe(expected);
+  }
+  expect((await link(profile.id, target.id, { csrf: false })).status).toBe(403);
+  const [permission] = await db
+    .select()
+    .from(t.permisos)
+    .where(eq(t.permisos.codigo, 'observers:link-account'));
+  const grants = await db
+    .select()
+    .from(t.rolPermisos)
+    .where(eq(t.rolPermisos.permisoId, permission.id));
+  const context = await app.get(AuthService).authenticate({ headers: { cookie: admin.cookie } });
+  await db.delete(t.rolPermisos).where(eq(t.rolPermisos.permisoId, permission.id));
+  try {
+    for (const cookie of [admin.cookie, enlace.cookie]) {
+      expect((await link(profile.id, target.id, { cookie })).status).toBe(403);
+      expect(
+        (await request(`/linkable-account?username=${target.username}`, { cookie })).status,
+      ).toBe(403);
+    }
+    await expect(
+      app.get(ObserversService).linkAccount(context, profile.id, linkInput(target.id)),
+    ).rejects.toMatchObject({ status: 403 });
+  } finally {
+    await db.insert(t.rolPermisos).values(grants);
+  }
+});
+
+it('rolls back linking and session revocation when audit insertion fails', async () => {
+  const target = await account('OBSERVADOR');
+  const profile = await (await create()).json();
+  const sessions = await db.select().from(t.sesiones).where(eq(t.sesiones.usuarioId, target.id));
+  const before = await events(profile.id);
+  rootSql(
+    `DELIMITER $$
+CREATE TRIGGER \`${database}\`.synthetic_link_failure BEFORE INSERT ON \`${database}\`.auditoria FOR EACH ROW BEGIN IF NEW.accion = 'observers.account.linked' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'synthetic-secret-error'; END IF; END$$
+DELIMITER ;`,
+  );
+  try {
+    const response = await link(profile.id, target.id);
+    expect(response.status).toBe(500);
+    expect(await response.text()).not.toContain('synthetic-secret-error');
+  } finally {
+    rootSql(`DROP TRIGGER \`${database}\`.synthetic_link_failure;`);
+  }
+  expect(await (await request(`/${profile.id}`)).json()).toEqual(profile);
+  expect(await db.select().from(t.sesiones).where(eq(t.sesiones.usuarioId, target.id))).toEqual(
+    sessions,
+  );
+  expect(await events(profile.id)).toEqual(before);
 });
 
 it('requires each explicit permission, valid sessions, changed passwords and CSRF without an ADMIN bypass', async () => {

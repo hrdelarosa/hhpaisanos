@@ -95,7 +95,18 @@ Confirmed initial Observers backend scope:
 - Profile activation/deactivation never modifies the linked account, its sessions or historical relationships. No physical deletion is exposed.
 - Require explicit `observers:read`, `observers:create`, `observers:update` and `observers:change-status` permissions, without role-name bypasses. Approved grants: ADMIN and ENLACE receive all four; OBSERVADOR receives none. These permissions belong to the explicit centralized provisioning catalog.
 - Mutations revalidate current authority transactionally and commit atomically with audit. Personal edits audit changed field names rather than copies of names or phones.
-- Account linking, unlinking, reassignment, self-service and assignment workflows are not exposed by this module.
+- Account linking follows the approved scope below. Unlinking, reassignment and self-service remain deferred; assignment workflows belong to Assignments.
+
+Confirmed Observer Account Linking scope:
+
+- ADMIN and ENLACE receive the explicit `observers:link-account` permission through centralized provisioning. OBSERVADOR receives none. This does not grant ENLACE Users administration access or introduce role-name bypasses.
+- `GET /api/observers/linkable-account` accepts an exact username and exposes only an eligible account's ID, username and full name. Ineligible and absent accounts return the same not-found response. It is not a general Users directory.
+- `PUT /api/observers/:id/account` accepts an existing account UUIDv7, `verificationMethod: supervised_administrative`, and a nonblank reason of at most 500 Unicode code points.
+- The responsible operator must verify the person's identity under institutionally approved procedures, witness independent sign-in with definitive credentials, and confirm the exact account/profile pairing. The method is an operator attestation, not cryptographic proof of consent. Names, phones and UUIDs are not identity evidence. Never request passwords or store identity-document copies.
+- New links require an active account with an active OBSERVADOR role, no mandatory password change or current login lockout, no linked profile, and an active accountless observer profile. An active assignment is not required.
+- Mutations revalidate actor authority and eligibility within a transaction, locking the target account before the profile. Linking, revocation of the target account's existing sessions and `observers.account.linked` audit commit atomically. No account credentials, role, status or assignment is changed.
+- Conflicting links are rejected, never replaced. Identical links with an existing audit event for that exact pair and verification method are idempotent without further events or session revocation. Legacy links without this evidence are preserved but rejected for certification; regularization requires a separate approved process.
+- Future personal capture must resolve the observer from the authenticated user and verify the current pair's linking evidence, profile status, permissions and assignment ownership transactionally. Linking alone enables no capture or historical reattribution. Telegram linking remains separate and deferred.
 
 ## 6. Assignments
 
@@ -196,7 +207,7 @@ Account-management policies confirmed for the initial Users implementation:
 - Temporary passwords are securely generated server-side and returned only in the successful creation/reset response, never stored in plaintext. Delivery requires an authorized operational channel.
 - Administrative reset clears temporary login lockout, requires password change and revokes sessions without reactivating an inactive account. Deactivation and effective role changes revoke sessions; reactivation never restores them.
 - Account mutations and relevant audit events are atomic. Role-permission editing and observer profile management are not exposed through Users.
-- Permission provisioning is explicit, idempotent and audited, never automatic at startup or migration time. The approved closed set is `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read`, `operatives:read`, `operatives:create`, `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`, `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`. ADMIN receives all twenty-two; ENLACE receives both Operatives permissions and all twelve Observers/Attention Modules/Assignments permissions; OBSERVADOR receives none of this set. Other permission mappings remain unchanged.
+- Permission provisioning is explicit, idempotent and audited, never automatic at startup or migration time. The approved closed set is `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read`, `operatives:read`, `operatives:create`, `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `observers:link-account`, `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`, `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`. ADMIN receives all twenty-three; ENLACE receives both Operatives permissions and all thirteen Observers/Attention Modules/Assignments permissions; OBSERVADOR receives none of this set. Other permission mappings remain unchanged.
 
 ## 10. Audit and traceability
 
