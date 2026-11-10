@@ -11,8 +11,8 @@ services:
       TZ: UTC
     ports:
       - '127.0.0.1:3306:3306'
-    tmpfs:
-      - /var/lib/mysql
+    volumes:
+      - mysql_data:/var/lib/mysql
     healthcheck:
       test:
         - CMD-SHELL
@@ -20,3 +20,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+volumes:
+  mysql_data:
+    name: hhpaisanos_mysql_data

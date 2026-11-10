@@ -82,19 +82,18 @@ build cache optimization has been adopted.
 
 ## Local MySQL and environment
 
-Run Docker Compose commands from the repository root. Copy `.env.example` to
-`.env`, then replace both example passwords with distinct local passwords:
+Run Docker Compose commands from the repository root. For first setup only, copy
+`.env.example` to `.env` and set distinct local passwords; preserve an existing `.env`:
 
 ```powershell
 Copy-Item .env.example .env
 # Edit .env locally; never commit it or print resolved Compose credentials.
-docker compose up -d --wait
+docker compose up -d --pull never --wait mysql
 docker compose ps
 docker inspect hhpaisanos-mysql --format '{{json .State.Health.Status}}'
 docker inspect hhpaisanos-mysql --format '{{json .Mounts}}'
-docker inspect hhpaisanos-mysql --format '{{json .HostConfig.Tmpfs}}'
-docker exec hhpaisanos-mysql sh -c 'grep /var/lib/mysql /proc/mounts'
 pnpm --filter @hhpaisanos/api db:check
+# Database reconstruction is a separate, explicitly authorized step.
 pnpm --filter @hhpaisanos/api db:migrate
 pnpm dev
 ```
@@ -118,29 +117,49 @@ do not change the port mapping to work around hostname resolution problems.
 The Compose healthcheck checks server availability; `db:check` verifies the
 application credentials and connection.
 
-**All MySQL data is disposable.** `/var/lib/mysql` is `tmpfs`, with no named,
-anonymous or host-mounted data volume. Docker may list this mount only in
-`HostConfig.Tmpfs`, not `Mounts`; `/proc/mounts` must show `tmpfs`. Data is lost
-when the container stops or restarts, including Docker/host restarts. Migrate
-again after starting it; do not store operational data here. No seed data is
-installed.
+**Local MySQL storage is persistent.** Compose key `mysql_data` mounts the dedicated
+Docker named volume `hhpaisanos_mysql_data` at `/var/lib/mysql`. Verify `.Mounts`
+shows type `volume`, that exact name and destination, and no tmpfs at that path.
+Stop/start, Docker restarts and normal container recreation retain the database;
+they do not require replaying migrations. Use synthetic development data, not real
+operational data. A fresh volume creates the database and MySQL accounts only;
+application migrations, roles, administrator bootstrap and permissions remain
+separate authorized operations and never run automatically.
 
 ```sh
-# Stop MySQL: this loses the database contents.
+# Stop and start without deleting database contents.
 docker compose stop mysql
-# Restart and recreate the schema explicitly.
-docker compose up -d --wait
-pnpm --filter @hhpaisanos/api db:migrate
-
-# Reset only this project's disposable development container/network.
-docker compose down
-docker compose up -d --wait
-pnpm --filter @hhpaisanos/api db:migrate
+docker compose start --wait mysql
+# Recreate only MySQL when an approved service configuration change requires it.
+# Requires the intended mysql:8.4 image to be available locally; no image is pulled.
+docker compose up -d --no-deps --force-recreate --pull never --wait mysql
 ```
 
-No `docker system prune`, volume deletion, or unrelated-container operation is
-needed. Changing `.env` credentials requires recreating the disposable container
-(`docker compose down` followed by `up`), not just restarting the old container.
+Never use `docker compose down -v`, remove `hhpaisanos_mysql_data`, or prune volumes
+as routine maintenance: these operations can destroy the database. Plain `down`
+retains the named volume, but is unnecessary for normal service stop/start. Do not
+reuse or modify the unrelated `paisanos-dev` volumes. The explicit volume name is
+shared across worktrees; use one local MySQL service, not parallel worktree instances.
+
+`MYSQL_DATABASE`, `MYSQL_USER` and the password environment variables initialize an
+**empty data directory only**. Editing `.env` or recreating a container does not
+change existing MySQL account passwords. Rotate credentials through an explicitly
+authorized MySQL account change, then update local configuration consistently;
+never delete the volume to make new environment values take effect.
+
+### Local backups
+
+A persistent volume is not a backup: deletion, corruption or Docker storage loss
+can still destroy it. After database initialization and before migrations or storage
+changes, export a logical dump of `hhpaisanos` with `mysqldump --single-transaction
+--no-tablespaces --set-gtid-purged=OFF --routines --events --triggers` to include stored
+objects when present. Do not run concurrent DDL during the dump. Keep credentials
+out of command arguments and output; use a protected credential source. Store timestamped dumps
+outside the repository and Docker volume with restricted access, retaining a few
+recent copies. Dumps contain sensitive account/session data, even in development.
+Check command success and periodically test restoration in a separately authorized,
+isolated database; never overwrite the working database as a restore test. Do not
+copy live MySQL data files as a substitute for a consistent dump.
 
 ## Schema, migrations and verification
 
@@ -176,8 +195,9 @@ tracks completed migrations in `__drizzle_migrations`; rerunning skips them.
 Never aim these commands at an existing/unrelated database without approval.
 MySQL DDL is not transactionally reversible: a failed migration may leave some
 DDL applied without a completed tracking row. Commands report failure without
-printing credentials or SQL values. Inspect migration state; for this disposable
-environment, reset and replay rather than assuming rollback or blindly retrying.
+printing credentials or SQL values. Inspect migration state and preserve a backup
+before planning recovery; never assume rollback, blindly retry or reset persistent
+data. Any restore or reconstruction requires explicit authorization.
 
 Unit and process-health tests run without MySQL. Integration tests require the
 documented running Compose service and `localhost` configuration. They create a
@@ -200,7 +220,7 @@ integration remains deferred and must protect activity against period changes be
 capture is enabled.
 
 The Compose-created `hhpaisanos` account intentionally has broad privileges on
-the **disposable development database** so it can apply migrations. It does not
+the **local development database** so it can apply migrations. It does not
 make audit data immutable. For any non-disposable environment, provision separate
 migration and runtime accounts: the runtime account must have no DDL, no global
 or database-wide write grants, only the required table privileges, and only
@@ -266,7 +286,7 @@ and log no driver exception details, because Drizzle errors may embed SQL values
 
 ### Explicit local administrator bootstrap
 
-After explicitly migrating the disposable local database, run:
+After explicitly migrating the local development database, run:
 
 ```sh
 pnpm --filter @hhpaisanos/api auth:bootstrap-admin local-admin
@@ -525,8 +545,8 @@ Prerequisites: migrated schema,
 existing ADMIN/ENLACE/OBSERVADOR roles, and an existing active ADMIN account with
 an active ADMIN role. Missing roles cause a failure without writes; this command
 does not create roles or accounts. The development bootstrap creates only ADMIN.
-Initialize missing approved roles explicitly in the disposable local development
-database, after applying migrations with authorization:
+Initialize missing approved roles explicitly in the local development database,
+after applying migrations with authorization:
 
 ```sh
 pnpm --filter @hhpaisanos/api roles:init-dev
