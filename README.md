@@ -308,30 +308,45 @@ security concurrency tests still send concurrent requests within each test.
 
 ## Operatives backend
 
-The initial module exposes only:
+The module exposes:
 
-| Endpoint                  | Permission          | Behavior                                                                              |
-| ------------------------- | ------------------- | ------------------------------------------------------------------------------------- |
-| `POST /api/operatives`    | `operatives:create` | Accepts `name`, `startDate`, `endDate`; creates `borrador` with atomic audit          |
-| `GET /api/operatives`     | `operatives:read`   | Filters by `name` (literal substring) and `status`; paginates with `page` and `limit` |
-| `GET /api/operatives/:id` | `operatives:read`   | Retrieves a UUIDv7 operative or returns 404                                           |
+| Endpoint                            | Permission            | Behavior                                                                                                  |
+| ----------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------- |
+| `POST /api/operatives`              | `operatives:create`   | Accepts `name`, `startDate`, `endDate`; creates `borrador` with atomic audit                              |
+| `GET /api/operatives`               | `operatives:read`     | Filters by `name` (literal substring) and `status`; paginates with `page` and `limit`                     |
+| `GET /api/operatives/:id`           | `operatives:read`     | Retrieves a UUIDv7 operative or returns 404                                                               |
+| `POST /api/operatives/:id/activate` | `operatives:activate` | Accepts explicit `arrivalToleranceMinutes` and `reason`; activates a draft with atomic audit; returns 204 |
 
 Dates are strict civil `YYYY-MM-DD` values in the MySQL DATE range, with start <= end.
 Names are trimmed without changing casing, accents or internal whitespace. The new
 `0001_operatives_name_dates_unique` migration rejects equivalent names with identical
 dates using the existing column collation (verified `utf8mb4_0900_ai_ci` in isolated
 MySQL 8.4). Conflicts return 409, including concurrent submissions. Overlapping
-intervals are allowed. Editing, transitions and deletion are not implemented.
+intervals are allowed. Editing, closing, reopening and deletion are not implemented.
+
+Activation accepts only `{ "arrivalToleranceMinutes": 15, "reason": "Approved operational start" }`.
+Tolerance is required, with no implicit default: 15 minutes is the initial operational
+setting, but it is configurable as a nonnegative integer within the existing unsigned
+SMALLINT range (0–65535). Reasons must be nonblank and at most 500 Unicode code points.
+Only `borrador` can become `activo`; repeated activation and all other state transitions
+return 409, without changing tolerance, timestamps or audit. Tolerance cannot be edited
+after activation through this API. The interval must be valid and must not have ended
+before today in `America/Mexico_City`; activation is allowed before its first date and
+on its final date. Civil time is evaluated after acquiring locks. Actor/session/permission
+revalidation, operative locking, state/tolerance changes and `operatives.activated` audit
+use one transaction. Assignments, previous audit and unrelated settings remain unchanged.
+No Attendance capture or persistence is enabled. The existing schema is sufficient;
+this feature adds no migration.
 
 List responses contain `items`, `page`, `limit`, and `total`. Defaults are page 1
 and limit 20 (maximum 100), ordered by start date descending, then UUID descending.
-Details expose `id`, `name`, `startDate`, `endDate`, `status`, `createdAt`, `updatedAt`;
+Details expose `id`, `name`, `startDate`, `endDate`, `status`, `arrivalToleranceMinutes`, `createdAt`, `updatedAt`;
 timestamps are UTC strings with six fractional digits. Global session, mandatory
 password-change, CSRF and permission protections apply unchanged.
 
 **Permission dependency:** the Users module owns initial provisioning. Approved
-grants are ADMIN and ENLACE: `operatives:read` and `operatives:create`;
-OBSERVADOR: neither. No grants or role bypasses are introduced
+grants are ADMIN and ENLACE: `operatives:read`, `operatives:create` and `operatives:activate`;
+OBSERVADOR: none. No grants or role bypasses are introduced
 by Operatives. Use the Users-owned `users:provision-permissions` command described
 below; without provisioned grants, real accounts cannot use these endpoints.
 
@@ -573,25 +588,25 @@ pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approv
 pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approved initial access" --apply
 ```
 
-The closed mapping contains exactly twenty-three codes:
+The closed mapping contains exactly twenty-four codes:
 
-| Permission group  | Codes                                                                                                                                              | ADMIN     | ENLACE   | OBSERVADOR |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------- | ---------- |
-| Users/catalog     | `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read` | All eight | None     | None       |
-| Operatives        | `operatives:read`, `operatives:create`                                                                                                             | Both      | Both     | None       |
-| Observers         | `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `observers:link-account`                                      | All five  | All five | None       |
-| Attention Modules | `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`                                | All four  | All four | None       |
-| Assignments       | `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`                                                               | All four  | All four | None       |
+| Permission group  | Codes                                                                                                                                              | ADMIN     | ENLACE    | OBSERVADOR |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- | ---------- |
+| Users/catalog     | `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read` | All eight | None      | None       |
+| Operatives        | `operatives:read`, `operatives:create`, `operatives:activate`                                                                                      | All three | All three | None       |
+| Observers         | `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `observers:link-account`                                      | All five  | All five  | None       |
+| Attention Modules | `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`                                | All four  | All four  | None       |
+| Assignments       | `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`                                                               | All four  | All four  | None       |
 
-For databases provisioned with the previous twenty-two-code mapping, preview and explicitly
+For databases provisioned with the previous twenty-three-code mapping, preview and explicitly
 apply the same command again after separate authorization. It preserves existing permission
-identifiers and approved grants, adding `observers:link-account` for ADMIN/ENLACE.
+identifiers and approved grants, adding `operatives:activate` for ADMIN/ENLACE only.
 Upgrading older mappings also reconciles the existing operational grants. This does
-not add operative lifecycle endpoints or implicit ADMIN privileges.
+not grant observer capture permissions or implicit ADMIN privileges.
 
 Grants belong to roles, so all accounts with the role receive them. Applying the
 command creates missing permission rows, adds missing approved grants and removes
-incorrect grants **within these twenty-three codes and three roles only**. Other permissions,
+incorrect grants **within these twenty-four codes and three roles only**. Other permissions,
 other roles and existing descriptions are untouched. Actual changes have individual
 administrative audit events with the actor and supplied reason in one transaction;
 repeating an already-applied mapping writes nothing. The command never runs on
@@ -717,7 +732,7 @@ is included here.
 Health only reports process availability, not database or external-service
 readiness. Startup verifies MySQL connectivity and shutdown closes the pool.
 Backend authentication, permission guards, scoped account administration, observer
-profile administration, attention modules, persistent assignment management and initial operative creation/consultation are implemented; other business workflows, frontend
+profile administration, attention modules, persistent assignment management and operative creation/consultation/activation are implemented; other business workflows, frontend
 authentication, Telegram, deployment and CI/CD remain deferred. Persistence tables
 alone do not implement their workflows.
 

@@ -49,7 +49,15 @@ Confirmed initial backend scope:
 - Trim leading/trailing name whitespace, preserving casing, accents and internal whitespace. Equivalent names under the existing database column collation and identical start/end dates are duplicates.
 - Require `operatives:read` for listing/details and `operatives:create` for creation, without role-name bypasses. The approved grants are ADMIN and ENLACE: both; OBSERVADOR: neither. Explicit centralized permission provisioning belongs to the Users module.
 - Creation and its administrative audit event commit atomically.
-- Editing, status transitions, activation, closing, reopening and deletion are not exposed in the initial release. Modification and reopening policies remain pending.
+- Editing, closing, reopening and deletion are not exposed. Modification and reopening policies remain pending.
+
+Confirmed minimal Operative Activation scope:
+
+- `POST /api/operatives/:id/activate` transitions only `borrador` to `activo`. Require explicit `operatives:activate`, granted to ADMIN and ENLACE only through centralized provisioning, without role-name bypasses.
+- Accept only a nonblank administrative `reason` of at most 500 Unicode code points and explicit integer `arrivalToleranceMinutes`. The initial operational value is 15 minutes; configuration uses the existing unsigned SMALLINT range (0–65535), with no implicit default.
+- Validate the operative interval and reject periods ending before today in `America/Mexico_City`. Future periods and periods ending today may be activated. Evaluate today after transactional locks.
+- Revalidate actor/session/permission in the transaction, lock the operative and atomically commit activation, tolerance and `operatives.activated` audit. Preserve assignments, historical data and unrelated settings.
+- Repeated or incompatible transitions return 409 without writes. Tolerance is immutable after activation through the API. No Attendance schema, capture, closure or reopening is introduced.
 
 ## 4. Attention modules
 
@@ -207,7 +215,7 @@ Account-management policies confirmed for the initial Users implementation:
 - Temporary passwords are securely generated server-side and returned only in the successful creation/reset response, never stored in plaintext. Delivery requires an authorized operational channel.
 - Administrative reset clears temporary login lockout, requires password change and revokes sessions without reactivating an inactive account. Deactivation and effective role changes revoke sessions; reactivation never restores them.
 - Account mutations and relevant audit events are atomic. Role-permission editing and observer profile management are not exposed through Users.
-- Permission provisioning is explicit, idempotent and audited, never automatic at startup or migration time. The approved closed set is `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read`, `operatives:read`, `operatives:create`, `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `observers:link-account`, `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`, `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`. ADMIN receives all twenty-three; ENLACE receives both Operatives permissions and all thirteen Observers/Attention Modules/Assignments permissions; OBSERVADOR receives none of this set. Other permission mappings remain unchanged.
+- Permission provisioning is explicit, idempotent and audited, never automatic at startup or migration time. The approved closed set is `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read`, `operatives:read`, `operatives:create`, `operatives:activate`, `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `observers:link-account`, `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`, `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`. ADMIN receives all twenty-four; ENLACE receives all three Operatives permissions and all thirteen Observers/Attention Modules/Assignments permissions; OBSERVADOR receives none of this set. Other permission mappings remain unchanged.
 
 ## 10. Audit and traceability
 

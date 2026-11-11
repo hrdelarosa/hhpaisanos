@@ -24,6 +24,7 @@ const roleIds = {};
 const operationalPermissions = [
   'operatives:read',
   'operatives:create',
+  'operatives:activate',
   'observers:read',
   'observers:create',
   'observers:update',
@@ -169,7 +170,7 @@ it('provisions only the approved mappings explicitly, atomically and idempotentl
     'permissions:read',
     ...operationalPermissions,
   ]);
-  expect(preview).toHaveLength(61); // 23 permission rows, 23 ADMIN grants, 15 ENLACE grants.
+  expect(preview).toHaveLength(64); // 24 permission rows, 24 ADMIN grants, 16 ENLACE grants.
   expect(await db.select().from(t.permisos)).toEqual([]);
   expect(await db.select().from(t.rolPermisos)).toEqual([]);
   expect(await db.select().from(t.auditoria)).toEqual([]);
@@ -212,7 +213,7 @@ it('provisions only the approved mappings explicitly, atomically and idempotentl
   const before = await db.select().from(t.auditoria);
   expect(await provisionUsersPermissions(db, admin.id, 'Repeat', true)).toEqual([]);
   expect(await db.select().from(t.auditoria)).toEqual(before);
-  expect(before.filter((e) => e.accion.startsWith('access.'))).toHaveLength(62);
+  expect(before.filter((e) => e.accion.startsWith('access.'))).toHaveLength(65);
   expect(
     before
       .filter((e) => e.accion.startsWith('access.'))
@@ -222,7 +223,9 @@ it('provisions only the approved mappings explicitly, atomically and idempotentl
 });
 
 it('upgrades the previous ten-code mapping without changing existing grants or accounts', async () => {
-  const addedCodes = operationalPermissions.filter((code) => !code.startsWith('operatives:'));
+  const addedCodes = operationalPermissions.filter(
+    (code) => !['operatives:read', 'operatives:create'].includes(code),
+  );
   const added = await db.select().from(t.permisos).where(inArray(t.permisos.codigo, addedCodes));
   const addedIds = added.map((permission) => permission.id);
   await db.delete(t.rolPermisos).where(inArray(t.rolPermisos.permisoId, addedIds));
@@ -241,7 +244,7 @@ it('upgrades the previous ten-code mapping without changing existing grants or a
   const observersBefore = await db.select().from(t.observadores);
   const auditBefore = await db.select().from(t.auditoria);
   const preview = await provisionUsersPermissions(db, admin.id, 'Upgrade preview');
-  expect(preview).toHaveLength(40); // Thirteen new rows and grants for both roles, plus ENLACE creation.
+  expect(preview).toHaveLength(43); // Fourteen new rows and grants for both roles, plus ENLACE creation.
   expect(preview.every((change) => change.action !== 'grant.remove')).toBe(true);
   expect(await db.select().from(t.permisos)).toEqual(existingPermissions);
   expect(await db.select().from(t.rolPermisos)).toEqual(existingGrants);
@@ -253,13 +256,13 @@ it('upgrades the previous ten-code mapping without changing existing grants or a
   expect(await db.select().from(t.sesiones)).toEqual(sessionsBefore);
   expect(await db.select().from(t.observadores)).toEqual(observersBefore);
   const auditAfter = await db.select().from(t.auditoria);
-  expect(auditAfter).toHaveLength(auditBefore.length + 40);
-  expect(auditAfter.filter((event) => event.motivo === 'Approved upgrade')).toHaveLength(40);
+  expect(auditAfter).toHaveLength(auditBefore.length + 43);
+  expect(auditAfter.filter((event) => event.motivo === 'Approved upgrade')).toHaveLength(43);
   expect(await provisionUsersPermissions(db, admin.id, 'Repeat upgrade', true)).toEqual([]);
   expect(await db.select().from(t.auditoria)).toEqual(auditAfter);
 });
 
-it('upgrades eighteen permissions to twenty-two without touching existing data or unrelated grants', async () => {
+it('restores assignment permissions without touching existing data or unrelated grants', async () => {
   const assignmentCodes = operationalPermissions.filter((code) => code.startsWith('assignments:'));
   const added = await db
     .select()
@@ -289,7 +292,7 @@ it('upgrades eighteen permissions to twenty-two without touching existing data o
   expect(await db.select().from(t.auditoria)).toHaveLength(auditBefore.length + 12);
 });
 
-it('upgrades twenty-two permissions without altering existing grants, accounts or sessions', async () => {
+it('restores account-linking permissions without altering existing grants, accounts or sessions', async () => {
   const [permission] = await db
     .select()
     .from(t.permisos)
@@ -310,6 +313,51 @@ it('upgrades twenty-two permissions without altering existing grants, accounts o
   const auditBefore = await db.select().from(t.auditoria);
   expect(await provisionUsersPermissions(db, admin.id, 'Repeat linking upgrade', true)).toEqual([]);
   expect(await db.select().from(t.auditoria)).toEqual(auditBefore);
+});
+
+it('upgrades the twenty-three-code mapping with activation grants only for ADMIN and ENLACE', async () => {
+  const [permission] = await db
+    .select()
+    .from(t.permisos)
+    .where(eq(t.permisos.codigo, 'operatives:activate'));
+  await db.delete(t.rolPermisos).where(eq(t.rolPermisos.permisoId, permission.id));
+  await db.delete(t.permisos).where(eq(t.permisos.id, permission.id));
+  const permissionsBefore = await db.select().from(t.permisos);
+  const grantsBefore = await db.select().from(t.rolPermisos);
+  const usersBefore = await db.select().from(t.usuarios);
+  const sessionsBefore = await db.select().from(t.sesiones);
+  const auditBefore = await db.select().from(t.auditoria);
+  const preview = await provisionUsersPermissions(db, admin.id, 'Activation upgrade');
+  expect(preview).toEqual([
+    { action: 'permission.create', permission: 'operatives:activate' },
+    { action: 'grant.add', role: 'ADMIN', permission: 'operatives:activate' },
+    { action: 'grant.add', role: 'ENLACE', permission: 'operatives:activate' },
+  ]);
+  expect(await db.select().from(t.auditoria)).toEqual(auditBefore);
+  expect(await db.select().from(t.permisos)).toEqual(permissionsBefore);
+  expect(await db.select().from(t.rolPermisos)).toEqual(grantsBefore);
+  expect(await provisionUsersPermissions(db, admin.id, 'Activation upgrade', true)).toEqual(
+    preview,
+  );
+  expect(await db.select().from(t.permisos)).toEqual(expect.arrayContaining(permissionsBefore));
+  expect(await db.select().from(t.rolPermisos)).toEqual(expect.arrayContaining(grantsBefore));
+  expect(await db.select().from(t.usuarios)).toEqual(usersBefore);
+  expect(await db.select().from(t.sesiones)).toEqual(sessionsBefore);
+  const [activation] = await db
+    .select()
+    .from(t.permisos)
+    .where(eq(t.permisos.codigo, 'operatives:activate'));
+  expect(
+    (await db.select().from(t.rolPermisos).where(eq(t.rolPermisos.permisoId, activation.id)))
+      .map((grant) => grant.rolId)
+      .sort(),
+  ).toEqual([roleIds.ADMIN, roleIds.ENLACE].sort((a, b) => a.localeCompare(b)));
+  const auditAfter = await db.select().from(t.auditoria);
+  expect(auditAfter).toHaveLength(auditBefore.length + 3);
+  expect(await provisionUsersPermissions(db, admin.id, 'Repeat activation upgrade', true)).toEqual(
+    [],
+  );
+  expect(await db.select().from(t.auditoria)).toEqual(auditAfter);
 });
 
 it('requires ADMIN and each explicit permission, rejects temporary credentials and CSRF', async () => {
