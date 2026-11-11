@@ -4,10 +4,10 @@ import { NestFactory } from '@nestjs/core';
 import { and, eq, sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/mysql2/migrator';
 import { v7 } from 'uuid';
-import { afterAll, beforeAll, expect, it } from 'vite-plus/test';
+import { afterAll, beforeAll, expect, it, vi } from 'vite-plus/test';
 import { AppModule } from '../dist/app.module.js';
 import { DatabaseService } from '../dist/database/database.service.js';
-import { hashPassword } from '../dist/modules/auth/auth.service.js';
+import { AuthService, hashPassword } from '../dist/modules/auth/auth.service.js';
 import * as t from '../dist/database/schema/index.js';
 import { rootSql } from './helpers/mysql.mjs';
 
@@ -75,14 +75,14 @@ beforeAll(async () => {
   baseUrl = await app.getUrl();
   db = app.get(DatabaseService).db;
   const permissionIds = {};
-  for (const code of ['operatives:read', 'operatives:create']) {
+  for (const code of ['operatives:read', 'operatives:create', 'operatives:activate']) {
     permissionIds[code] = v7();
     await db.insert(t.permisos).values({ id: permissionIds[code], codigo: code });
   }
   const roleIds = {};
   for (const [code, permissions] of [
-    ['ADMIN', ['operatives:read', 'operatives:create']],
-    ['ENLACE', ['operatives:read']],
+    ['ADMIN', ['operatives:read', 'operatives:create', 'operatives:activate']],
+    ['ENLACE', ['operatives:read', 'operatives:activate']],
     ['OBSERVADOR', []],
   ]) {
     const id = v7();
@@ -171,6 +171,7 @@ it('creates drafts, preserves names and calendar dates, retrieves and audits ato
     startDate: '2026-12-01',
     endDate: '2026-12-31',
     status: 'borrador',
+    arrivalToleranceMinutes: null,
     createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/),
     updatedAt: expect.any(String),
   });
@@ -314,4 +315,301 @@ it('rolls back creation if audit fails and does not misclassify other duplicate 
         ),
       ),
   ).toEqual([]);
+});
+
+function civilDay(offset = 0) {
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Mexico_City',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const value = new Date(`${today}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + offset);
+  return value.toISOString().slice(0, 10);
+}
+
+async function activationFixture(extra = {}) {
+  const response = await create(
+    input(`Activation ${v7()}`, { startDate: civilDay(-1), endDate: civilDay(10), ...extra }),
+  );
+  expect(response.status).toBe(201);
+  return response.json();
+}
+const activationInput = { reason: 'Approved operational start', arrivalToleranceMinutes: 15 };
+const activate = (id, body = activationInput, options = {}) =>
+  request(`/${id}/activate`, { method: 'POST', body, ...options });
+const operativeRow = async (id) =>
+  (await db.select().from(t.operativos).where(eq(t.operativos.id, id)))[0];
+const operativeEvents = (id) => db.select().from(t.auditoria).where(eq(t.auditoria.entidadId, id));
+
+it('activates for ADMIN and ENLACE with explicit immutable tolerance and atomic actor/session audit', async () => {
+  for (const [cookie, tolerance, dates] of [
+    [adminCookie, 15, { startDate: civilDay(), endDate: civilDay() }],
+    [enlaceCookie, 0, { startDate: civilDay(1) }],
+    [adminCookie, 20, {}],
+  ]) {
+    const operative = await activationFixture(dates);
+    const before = await operativeRow(operative.id);
+    const body = { ...activationInput, arrivalToleranceMinutes: tolerance };
+    const response = await activate(operative.id, body, { cookie });
+    expect(response.status).toBe(204);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const stored = await operativeRow(operative.id);
+    expect(stored).toMatchObject({
+      ...before,
+      estado: 'activo',
+      toleranciaMinutos: tolerance,
+      actualizadoEn: expect.any(String),
+    });
+    expect(await (await request(`/${operative.id}`)).json()).toMatchObject({
+      status: 'activo',
+      arrivalToleranceMinutes: tolerance,
+    });
+    const context = await app.get(AuthService).authenticate({ headers: { cookie } });
+    const events = await operativeEvents(operative.id);
+    expect(events).toHaveLength(2);
+    expect(events.find((event) => event.accion === 'operatives.activated')).toMatchObject({
+      usuarioId: context.user.id,
+      sesionId: context.sessionId,
+      tipoEntidad: 'operativos',
+      entidadId: operative.id,
+      canal: 'web',
+      motivo: body.reason,
+      valoresAnteriores: { status: 'borrador', arrivalToleranceMinutes: null },
+      valoresNuevos: { status: 'activo', arrivalToleranceMinutes: tolerance },
+    });
+    expect((await activate(operative.id, body)).status).toBe(409);
+    expect((await activate(operative.id, { ...body, arrivalToleranceMinutes: 30 })).status).toBe(
+      409,
+    );
+    expect(await operativeRow(operative.id)).toEqual(stored);
+    expect(await operativeEvents(operative.id)).toEqual(events);
+  }
+});
+
+it('rejects expired and closed operatives and invalid activation DTOs without writes', async () => {
+  const operative = await activationFixture();
+  const before = await operativeRow(operative.id);
+  const events = await operativeEvents(operative.id);
+  for (const body of [
+    {},
+    { reason: 'Missing tolerance' },
+    { arrivalToleranceMinutes: 15 },
+    { ...activationInput, reason: ' \n\t' },
+    { ...activationInput, reason: null },
+    { ...activationInput, reason: 123 },
+    { ...activationInput, reason: 'x'.repeat(501) },
+    ...[null, '15', -1, 65536, 1.5, true].map((arrivalToleranceMinutes) => ({
+      ...activationInput,
+      arrivalToleranceMinutes,
+    })),
+    { ...activationInput, status: 'activo' },
+    { ...activationInput, startDate: civilDay() },
+  ])
+    expect((await activate(operative.id, body)).status).toBe(400);
+  expect((await activate('invalid')).status).toBe(400);
+  expect((await activate(v7())).status).toBe(404);
+  expect(await operativeRow(operative.id)).toEqual(before);
+  expect(await operativeEvents(operative.id)).toEqual(events);
+  for (const closed of [false, true]) {
+    const target = await activationFixture(
+      closed
+        ? {}
+        : {
+            startDate: civilDay(-10),
+            endDate: civilDay(-1),
+          },
+    );
+    if (closed)
+      await db
+        .update(t.operativos)
+        .set({ estado: 'cerrado' })
+        .where(eq(t.operativos.id, target.id));
+    const original = await operativeRow(target.id),
+      audit = await operativeEvents(target.id);
+    expect((await activate(target.id)).status).toBe(409);
+    expect(await operativeRow(target.id)).toEqual(original);
+    expect(await operativeEvents(target.id)).toEqual(audit);
+  }
+});
+
+it('preserves assignments, their audit and unrelated geographic settings on activation', async () => {
+  const operative = await activationFixture();
+  const [{ id: observerId }] = await db
+    .insert(t.observadores)
+    .values({
+      nombres: 'Synthetic',
+      apellidos: 'Observer',
+      activo: true,
+    })
+    .$returningId();
+  const [{ id: moduleId }] = await db
+    .insert(t.modulosAtencion)
+    .values({
+      nombre: 'Synthetic module',
+      municipio: 'Synthetic',
+      activo: true,
+    })
+    .$returningId();
+  const context = await app.get(AuthService).authenticate({ headers: { cookie: adminCookie } });
+  await db.insert(t.asignaciones).values({
+    operativoId: operative.id,
+    observadorId: observerId,
+    moduloId: moduleId,
+    vigenteDesde: operative.startDate,
+    vigenteHasta: operative.endDate,
+    horaInicio: '09:00:00',
+    horaFin: '17:00:00',
+    creadoPor: context.user.id,
+  });
+  await db
+    .update(t.operativos)
+    .set({ precisionMaximaM: 50 })
+    .where(eq(t.operativos.id, operative.id));
+  const assignments = await db.select().from(t.asignaciones);
+  const audit = await db.select().from(t.auditoria);
+  expect((await activate(operative.id)).status).toBe(204);
+  expect(await db.select().from(t.asignaciones)).toEqual(assignments);
+  expect(await db.select().from(t.auditoria)).toEqual(expect.arrayContaining(audit));
+  expect((await operativeRow(operative.id)).precisionMaximaM).toBe(50);
+});
+
+it('uses the Mexico City civil date rather than the UTC date at expiration', async () => {
+  const dates = { startDate: '2030-12-01', endDate: '2030-12-31' };
+  const lastDay = await activationFixture(dates),
+    expired = await activationFixture(dates);
+  vi.useFakeTimers({ toFake: ['Date'] });
+  try {
+    vi.setSystemTime(new Date('2031-01-01T05:59:59.999Z'));
+    expect((await activate(lastDay.id)).status).toBe(204);
+    vi.setSystemTime(new Date('2031-01-01T06:00:00.000Z'));
+    expect((await activate(expired.id)).status).toBe(409);
+    expect((await operativeRow(expired.id)).estado).toBe('borrador');
+    expect(await operativeEvents(expired.id)).toHaveLength(1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('requires the exact activation permission, valid definitive sessions and CSRF', async () => {
+  const operative = await activationFixture();
+  for (const [cookie, expected] of [
+    ['', 401],
+    [observerCookie, 403],
+    [temporaryCookie, 403],
+  ])
+    expect((await activate(operative.id, activationInput, { cookie })).status).toBe(expected);
+  expect((await activate(operative.id, activationInput, { csrf: false })).status).toBe(403);
+  const [permission] = await db
+    .select()
+    .from(t.permisos)
+    .where(eq(t.permisos.codigo, 'operatives:activate'));
+  for (const [code, cookie] of [
+    ['ADMIN', adminCookie],
+    ['ENLACE', enlaceCookie],
+  ]) {
+    const [role] = await db.select().from(t.roles).where(eq(t.roles.codigo, code));
+    const where = and(eq(t.rolPermisos.rolId, role.id), eq(t.rolPermisos.permisoId, permission.id));
+    await db.delete(t.rolPermisos).where(where);
+    try {
+      expect((await activate(operative.id, activationInput, { cookie })).status).toBe(403);
+    } finally {
+      await db.insert(t.rolPermisos).values({ rolId: role.id, permisoId: permission.id });
+    }
+  }
+  expect((await operativeRow(operative.id)).estado).toBe('borrador');
+  expect(await operativeEvents(operative.id)).toHaveLength(1);
+});
+
+it('serializes competing activations across actors and commits exactly one decision', async () => {
+  const operative = await activationFixture();
+  const results = await Promise.all([
+    activate(operative.id),
+    activate(
+      operative.id,
+      { ...activationInput, arrivalToleranceMinutes: 20 },
+      { cookie: enlaceCookie },
+    ),
+  ]);
+  expect(results.map((response) => response.status).sort((a, b) => a - b)).toEqual([204, 409]);
+  expect((await operativeRow(operative.id)).toleranciaMinutos).toBe(
+    results[0].status === 204 ? 15 : 20,
+  );
+  expect(
+    (await operativeEvents(operative.id)).filter(
+      (event) => event.accion === 'operatives.activated',
+    ),
+  ).toHaveLength(1);
+});
+
+it('rolls back activation and tolerance if its audit fails without leaking driver details', async () => {
+  const operative = await activationFixture();
+  const before = await operativeRow(operative.id),
+    audit = await operativeEvents(operative.id);
+  rootSql(`CREATE TRIGGER \`${database}\`.synthetic_activation_audit_failure BEFORE INSERT ON \`${database}\`.auditoria
+    FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'synthetic-private-activation';`);
+  try {
+    const response = await activate(operative.id);
+    expect(response.status).toBe(500);
+    expect(await response.text()).not.toContain('synthetic-private-activation');
+  } finally {
+    rootSql(`DROP TRIGGER \`${database}\`.synthetic_activation_audit_failure;`);
+  }
+  expect(await operativeRow(operative.id)).toEqual(before);
+  expect(await operativeEvents(operative.id)).toEqual(audit);
+});
+
+it('revalidates authority when activation waits behind permission changes or logout', async () => {
+  const [role] = await db.select().from(t.roles).where(eq(t.roles.codigo, 'ENLACE'));
+  const [permission] = await db
+    .select()
+    .from(t.permisos)
+    .where(eq(t.permisos.codigo, 'operatives:activate'));
+  for (const operation of ['permission', 'logout']) {
+    const cookie = await account(role.id);
+    const context = await app.get(AuthService).authenticate({ headers: { cookie } });
+    const operative = await activationFixture();
+    const locked = Promise.withResolvers(),
+      release = Promise.withResolvers();
+    const revoke = db.transaction(async (tx) => {
+      await tx.select().from(t.usuarios).where(eq(t.usuarios.id, context.user.id)).for('update');
+      locked.resolve();
+      await release.promise;
+      if (operation === 'permission')
+        await tx
+          .delete(t.rolPermisos)
+          .where(and(eq(t.rolPermisos.rolId, role.id), eq(t.rolPermisos.permisoId, permission.id)));
+      else
+        await tx
+          .update(t.sesiones)
+          .set({ revocadaEn: sql`UTC_TIMESTAMP(6)` })
+          .where(eq(t.sesiones.id, context.sessionId));
+    });
+    let pending;
+    try {
+      await locked.promise;
+      pending = activate(operative.id, activationInput, { cookie });
+      await expect
+        .poll(
+          () =>
+            rootSql(`SELECT COUNT(*) FROM performance_schema.data_lock_waits w
+        JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID = w.BLOCKING_ENGINE_LOCK_ID
+        WHERE l.OBJECT_SCHEMA = '${database}' AND l.OBJECT_NAME = 'usuarios';`),
+          { timeout: 10000 },
+        )
+        .not.toBe('0');
+    } finally {
+      release.resolve();
+      await revoke;
+      try {
+        if (pending) expect((await pending).status).toBe(operation === 'permission' ? 403 : 401);
+      } finally {
+        if (operation === 'permission')
+          await db.insert(t.rolPermisos).values({ rolId: role.id, permisoId: permission.id });
+      }
+    }
+    expect((await operativeRow(operative.id)).estado).toBe('borrador');
+    expect(await operativeEvents(operative.id)).toHaveLength(1);
+  }
 });

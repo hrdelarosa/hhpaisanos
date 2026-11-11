@@ -24,6 +24,7 @@ export const approvedPermissions = [
   'permissions:read',
   'operatives:read',
   'operatives:create',
+  'operatives:activate',
   'observers:read',
   'observers:create',
   'observers:update',
@@ -43,6 +44,7 @@ const mappings = {
   ENLACE: [
     'operatives:read',
     'operatives:create',
+    'operatives:activate',
     'observers:read',
     'observers:create',
     'observers:update',

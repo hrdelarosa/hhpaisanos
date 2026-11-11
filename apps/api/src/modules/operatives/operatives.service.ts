@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,6 +9,8 @@ import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { DatabaseService } from '../../database/database.service.js';
 import { auditoria, operativos } from '../../database/schema/index.js';
 import type { AuthContext } from '../auth/auth.types.js';
+import { AuthService } from '../auth/auth.service.js';
+import type { ActivateOperativeDto } from './dto/activate-operative.dto.js';
 import type { CreateOperativeDto } from './dto/create-operative.dto.js';
 import type { ListOperativesQueryDto } from './dto/list-operatives-query.dto.js';
 
@@ -17,9 +20,17 @@ const projection = {
   startDate: operativos.fechaInicio,
   endDate: operativos.fechaFin,
   status: operativos.estado,
+  arrivalToleranceMinutes: operativos.toleranciaMinutos,
   createdAt: sql<string>`CONCAT(REPLACE(${operativos.creadoEn}, ' ', 'T'), 'Z')`,
   updatedAt: sql<string>`CONCAT(REPLACE(${operativos.actualizadoEn}, ' ', 'T'), 'Z')`,
 };
+
+const civilDate = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Mexico_City',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
 
 function isDuplicateOperative(error: unknown): boolean {
   const driver = error instanceof Error && error.cause ? error.cause : error;
@@ -35,7 +46,63 @@ function isDuplicateOperative(error: unknown): boolean {
 
 @Injectable()
 export class OperativesService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly auth: AuthService,
+  ) {}
+
+  async activate(id: string, input: ActivateOperativeDto, context: AuthContext): Promise<void> {
+    try {
+      await this.database.db.transaction(async (tx) => {
+        const current = await this.auth.requireCurrentContext(tx, context);
+        if (!current.user.permissions.includes('operatives:activate'))
+          throw new ForbiddenException('Insufficient permissions');
+        const [operative] = await tx
+          .select()
+          .from(operativos)
+          .where(eq(operativos.id, id))
+          .for('update');
+        if (!operative) throw new NotFoundException('Operative not found');
+        if (operative.estado !== 'borrador')
+          throw new ConflictException('Only draft operatives can be activated');
+        // Evaluate the civil day after locks: a waiting request can cross midnight.
+        const today = civilDate.format(new Date());
+        if (operative.fechaInicio > operative.fechaFin || operative.fechaFin < today)
+          throw new ConflictException('Operative interval is invalid or expired');
+        await tx
+          .update(operativos)
+          .set({ estado: 'activo', toleranciaMinutos: input.arrivalToleranceMinutes })
+          .where(eq(operativos.id, id));
+        await tx.insert(auditoria).values({
+          usuarioId: current.user.id,
+          sesionId: current.sessionId,
+          accion: 'operatives.activated',
+          tipoEntidad: 'operativos',
+          entidadId: id,
+          valoresAnteriores: {
+            status: operative.estado,
+            arrivalToleranceMinutes: operative.toleranciaMinutos,
+          },
+          valoresNuevos: {
+            status: 'activo',
+            arrivalToleranceMinutes: input.arrivalToleranceMinutes,
+          },
+          motivo: input.reason,
+          canal: 'web',
+        });
+      });
+    } catch (error) {
+      const driver = error instanceof Error && error.cause ? error.cause : error;
+      if (
+        typeof driver === 'object' &&
+        driver !== null &&
+        'code' in driver &&
+        (driver.code === 'ER_LOCK_DEADLOCK' || driver.code === 'ER_LOCK_WAIT_TIMEOUT')
+      )
+        throw new ConflictException('Concurrent operative operation; reload and retry');
+      throw error;
+    }
+  }
 
   async create(input: CreateOperativeDto, context: AuthContext) {
     if (input.startDate > input.endDate) throw new BadRequestException('Invalid operative dates');

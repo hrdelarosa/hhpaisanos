@@ -94,9 +94,11 @@ A person can participate in an operative without credentials, for authorized man
 ### `operativos`
 `id`; `nombre VARCHAR(120)`; `fecha_inicio DATE`; `fecha_fin DATE`; `estado VARCHAR(20)` (`borrador`, `activo`, `cerrado`); `tolerancia_minutos SMALLINT UNSIGNED NULL`; `precision_maxima_m SMALLINT UNSIGNED NULL`; timestamps. Check `fecha_inicio <= fecha_fin`.
 
-Tolerance and GPS precision settings are nullable: no invented automatic validation policy. Operational defaults and location requirements need confirmation.
+Tolerance remains nullable before activation; activation requires an explicit value as described below. GPS precision remains optional and location-validation requirements need confirmation. Neither column alone enables Attendance capture.
 
-The initial Operatives API creates `borrador` records only. Names are trimmed at the API boundary; original casing, accents and internal whitespace are retained. A unique index on (`nombre`, `fecha_inicio`, `fecha_fin`) enforces duplicates using the existing name collation. The baseline column was verified as `utf8mb4_0900_ai_ci` on isolated MySQL 8.4, so name equivalence is case- and accent-insensitive. Operative intervals may overlap. See `REQUIREMENTS.md` section 3 for the approved initial scope and permissions.
+The Operatives creation API creates `borrador` records only. Names are trimmed at the API boundary; original casing, accents and internal whitespace are retained. A unique index on (`nombre`, `fecha_inicio`, `fecha_fin`) enforces duplicates using the existing name collation. The baseline column was verified as `utf8mb4_0900_ai_ci` on isolated MySQL 8.4, so name equivalence is case- and accent-insensitive. Operative intervals may overlap. See `REQUIREMENTS.md` section 3 for the approved scope and permissions.
+
+Minimal activation uses the existing `estado` and `tolerancia_minutos` columns; no migration is required. A draft with a valid, nonexpired interval can be activated with explicit tolerance (initial operational setting: 15 minutes). Tolerance is immutable after activation through the API. Activation and its audit commit atomically under actor and operative locks. Attendance enforcement remains deferred; no capture policy is enabled by these columns alone.
 
 ### `modulos_atencion`
 `id`; `nombre VARCHAR(120)`; `municipio VARCHAR(100)`; `latitud DECIMAL(9,6) NULL`; `longitud DECIMAL(9,6) NULL`; `radio_validacion_m SMALLINT UNSIGNED NULL`; `activo BOOLEAN`; timestamps.
