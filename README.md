@@ -588,25 +588,28 @@ pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approv
 pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approved initial access" --apply
 ```
 
-The closed mapping contains exactly twenty-four codes:
+The closed mapping contains exactly twenty-six codes:
 
-| Permission group  | Codes                                                                                                                                              | ADMIN     | ENLACE    | OBSERVADOR |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- | ---------- |
-| Users/catalog     | `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read` | All eight | None      | None       |
-| Operatives        | `operatives:read`, `operatives:create`, `operatives:activate`                                                                                      | All three | All three | None       |
-| Observers         | `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `observers:link-account`                                      | All five  | All five  | None       |
-| Attention Modules | `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`                                | All four  | All four  | None       |
-| Assignments       | `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`                                                               | All four  | All four  | None       |
+| Permission group    | Codes                                                                                                                                              | ADMIN     | ENLACE    | OBSERVADOR |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- | ---------- |
+| Users/catalog       | `users:create`, `users:read`, `users:update`, `users:change-status`, `users:assign-role`, `users:reset-password`, `roles:read`, `permissions:read` | All eight | None      | None       |
+| Operatives          | `operatives:read`, `operatives:create`, `operatives:activate`                                                                                      | All three | All three | None       |
+| Observers           | `observers:read`, `observers:create`, `observers:update`, `observers:change-status`, `observers:link-account`                                      | All five  | All five  | None       |
+| Attention Modules   | `attention-modules:read`, `attention-modules:create`, `attention-modules:update`, `attention-modules:change-status`                                | All four  | All four  | None       |
+| Assignments         | `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`                                                               | All four  | All four  | None       |
+| Personal Attendance | `attendance:read-own`, `attendance:capture-own`                                                                                                    | None      | None      | Both       |
 
-For databases provisioned with the previous twenty-three-code mapping, preview and explicitly
+For databases provisioned with the previous twenty-four-code mapping, preview and explicitly
 apply the same command again after separate authorization. It preserves existing permission
-identifiers and approved grants, adding `operatives:activate` for ADMIN/ENLACE only.
+identifiers and approved grants, adding `attendance:read-own` and `attendance:capture-own`
+for OBSERVADOR only (four additions: two permission rows and two grants).
 Upgrading older mappings also reconciles the existing operational grants. This does
-not grant observer capture permissions or implicit ADMIN privileges.
+not grant implicit ADMIN/ENLACE privileges. Final role totals are ADMIN 24, ENLACE 16,
+OBSERVADOR 2; Attendance administrative permissions remain deferred.
 
 Grants belong to roles, so all accounts with the role receive them. Applying the
 command creates missing permission rows, adds missing approved grants and removes
-incorrect grants **within these twenty-four codes and three roles only**. Other permissions,
+incorrect grants **within these twenty-six codes and three roles only**. Other permissions,
 other roles and existing descriptions are untouched. Actual changes have individual
 administrative audit events with the actor and supplied reason in one transaction;
 repeating an already-applied mapping writes nothing. The command never runs on
@@ -759,6 +762,71 @@ From the approved checkout, install frozen dependencies, then run
 `pnpm --filter @hhpaisanos/api db:migrate`. MySQL DDL can partially apply; inspect failures
 before retrying. Review the migration journal, both new tables and unchanged assignments
 afterward. Do not rerun operative activation provisioning, bootstrap or role initialization.
+
+### Personal Attendance API (Stage 3)
+
+| Endpoint                            | Permission               | Behavior                                                                       |
+| ----------------------------------- | ------------------------ | ------------------------------------------------------------------------------ |
+| `POST /api/attendance/me/check-in`  | `attendance:capture-own` | Capture one logical entry; 201 with `{ attendanceId, state }`                  |
+| `POST /api/attendance/me/check-out` | `attendance:capture-own` | Capture one logical exit strictly after a usable entry; same response          |
+| `GET /api/attendance/me/today`      | `attendance:read-own`    | Current Mexico City date and eligible assignments, schedules and current marks |
+| `GET /api/attendance/me`            | `attendance:read-own`    | Own marked assignment/date groups with bounded pagination                      |
+
+All four require an authenticated active OBSERVADOR, an active observer profile resolved
+from the account and supervised administrative account-link evidence. Exact permissions
+are revalidated inside the transaction; ADMIN/ENLACE cannot use these APIs even with
+accidentally assigned own permissions. Responses use `Cache-Control: no-store`.
+
+Capture requires the existing CSRF headers and `Idempotency-Key` (1–128 visible ASCII
+characters, no spaces, exact/case-sensitive), and accepts only:
+
+```json
+{
+  "assignmentId": "<applicable UUIDv7>",
+  "expectedDate": "2026-11-12",
+  "location": { "latitude": 16.85, "longitude": -99.9, "accuracy": 12 }
+}
+```
+
+Alternatively supply `location: { "missingReason": "timeout" }`, using one of the six
+approved reasons. Missing location is accepted with `pending_review`/`missing_location`.
+Coordinates are unverified evidence, not proof of physical presence. No geofence or
+accuracy policy threshold is applied; validation includes the existing storage range.
+Unknown fields, client identity/state/type, mixed evidence and malformed coordinates are
+rejected. Optional selfie absence has no effect; uploads are not implemented.
+
+The existing two-transaction receipt implementation owns timestamp, idempotency,
+classification and audit. The route supplies entry/exit type; the server supplies receipt
+time and actor. Tolerance is inclusive; late/early/missing flags coexist. An exit requires
+a current entry not rejected/annulled and an official timestamp strictly after it. A new
+key cannot create a second logical mark. A failed business transaction leaves the receipt
+pending; retries preserve original content/time. Same key with different validated content
+returns 409. Terminal replay returns the original result without another mark/audit; the
+account, permission and linked active profile must still be authorized. It does not
+reclassify old policy or require today's operative eligibility. Ineligible capture returns
+403; `day_changed`, `initial_mark_exists` and `invalid_order` return 409. Definitive
+rejections remain bound to the key. Midnight rules are unchanged.
+
+Today returns `{ date, timeZone, assignments }`; each item includes assignment/operative/
+module identifiers and labels, `startTime`, `endTime`, `arrivalToleranceMinutes`, `checkIn`,
+`checkOut` and `completeness` (`none`, `check_in_only`, `check_out_only`, `complete`).
+Completeness is structural, separate from review acceptance; `none` is not an absence.
+Each mark exposes id/version, official UTC timestamp with six fractional digits,
+`reviewStatus`, calculated `anomalies` and `locationEvidence` (`provided_unverified` or
+`missing` with reason). Coordinates, accuracy values, receipts, account identities and
+administrative decision details are not returned.
+
+History accepts optional inclusive civil-date `from`/`to`, `page` (1–1,000,000) and `limit`
+(1–100; default 20), returning `{ items, total, page, limit }` in descending date order
+with assignment-id tie breaking. Pagination counts marked assignment/date groups, not
+individual versions. Only current versions are projected; no empty historical days or
+automatic absences are generated. Own history remains readable after operative closure
+or module deactivation, provided the account/profile authorization remains valid.
+
+Stage 3 reuses migration 0003 without schema changes. Shared permission provisioning is
+a separate authorized operation; no provisioning or migration runs on startup. Tests in
+`attendance-http.integration.test.mjs` use disposable synthetic MySQL databases. No
+administrative Attendance endpoints, frontend, Telegram, offline or Stage 4 are enabled.
 
 ## Git workflow
 

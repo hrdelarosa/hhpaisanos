@@ -12,6 +12,8 @@ import {
   usuarios,
 } from '../dist/database/schema/index.js';
 
+const ownAttendancePermissions = ['attendance:read-own', 'attendance:capture-own'];
+
 // Deliberately closed catalog: this command cannot provision arbitrary privileges.
 export const approvedPermissions = [
   'users:create',
@@ -38,9 +40,10 @@ export const approvedPermissions = [
   'assignments:create',
   'assignments:update',
   'assignments:cancel',
+  ...ownAttendancePermissions,
 ];
 const mappings = {
-  ADMIN: approvedPermissions,
+  ADMIN: approvedPermissions.filter((code) => !ownAttendancePermissions.includes(code)),
   ENLACE: [
     'operatives:read',
     'operatives:create',
@@ -59,7 +62,7 @@ const mappings = {
     'assignments:update',
     'assignments:cancel',
   ],
-  OBSERVADOR: [],
+  OBSERVADOR: ownAttendancePermissions,
 };
 
 export async function provisionUsersPermissions(db, actorId, reason, apply = false) {

@@ -478,6 +478,8 @@ it('renews sessions within the user scope but revalidates current permission and
   const result = await service.complete(renewed, id);
   expect(result.attendanceId).toBeDefined();
   await db.update(t.observadores).set({ activo: false }).where(eq(t.observadores.id, f.observerId));
+  await expect(service.complete(renewed, id)).rejects.toThrow('Observer is not eligible');
+  await db.update(t.observadores).set({ activo: true }).where(eq(t.observadores.id, f.observerId));
   expect(await service.complete(renewed, id)).toEqual(result);
   const unverified = await fixture(undefined, undefined, false);
   const pending = await establish(unverified);

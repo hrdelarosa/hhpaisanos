@@ -23,6 +23,7 @@ import { AuthService } from '../auth/auth.service.js';
 import type { AuthContext } from '../auth/auth.types.js';
 import { normalizeMark, type PersonalMark } from './attendance-input.js';
 import { instantMicros, localDate, receivedAt, timingFlags } from './attendance-time.js';
+import { authorizePersonalAttendance, hasAdministrativeLink } from './attendance-access.js';
 
 type Transaction = Parameters<Parameters<DatabaseService['db']['transaction']>[0]>[0];
 const operation = 'attendance.capture-own';
@@ -55,13 +56,7 @@ export class AttendancePersistence {
   }
 
   private async authorize(tx: Transaction, context: AuthContext) {
-    const current = await this.auth.requireCurrentContext(tx, context);
-    if (
-      current.user.role !== 'OBSERVADOR' ||
-      !current.user.permissions.includes('attendance:capture-own')
-    )
-      throw new ForbiddenException('Insufficient permissions');
-    return current;
+    return authorizePersonalAttendance(tx, this.auth, context, 'attendance:capture-own');
   }
 
   async establish(
@@ -128,10 +123,20 @@ export class AttendancePersistence {
         );
       if (!reference) throw new NotFoundException('Receipt not found');
       const content = normalizeMark(reference.contenido as PersonalMark);
+      // Identity comes from the account, never from the client's assignment reference.
+      const [observerReference] = await tx
+        .select({ id: observadores.id })
+        .from(observadores)
+        .where(eq(observadores.usuarioId, current.user.id));
       const [assignmentReference] = await tx
         .select()
         .from(asignaciones)
-        .where(eq(asignaciones.id, content.assignmentId));
+        .where(
+          and(
+            eq(asignaciones.id, content.assignmentId),
+            observerReference ? eq(asignaciones.observadorId, observerReference.id) : sql`FALSE`,
+          ),
+        );
 
       // Match scheduling: actor, operative SHARE, observer UPDATE, module SHARE,
       // assignment UPDATE, then receipt UPDATE. A pending receipt owns no assignment.
@@ -166,9 +171,18 @@ export class AttendancePersistence {
         .from(recibosAsistencia)
         .where(eq(recibosAsistencia.id, receiptId))
         .for('update');
-      // Replay is authorized anew, but never creates a mark or re-evaluates past policy.
-      if (receipt.estado !== 'pending') return receipt.resultado!;
-      const reject = async (code: 'ineligible' | 'day_changed' | 'initial_mark_exists') => {
+      const accredited =
+        observer?.activo &&
+        observer.usuarioId === current.user.id &&
+        (await hasAdministrativeLink(tx, observer.id, current.user.id));
+      // Replay requires the same eligible identity, but does not reclassify past policy.
+      if (receipt.estado !== 'pending') {
+        if (!accredited) throw new ForbiddenException('Observer is not eligible');
+        return receipt.resultado!;
+      }
+      const reject = async (
+        code: 'ineligible' | 'day_changed' | 'initial_mark_exists' | 'invalid_order',
+      ) => {
         const result = { code };
         await tx
           .update(recibosAsistencia)
@@ -181,6 +195,7 @@ export class AttendancePersistence {
         !operative ||
         !observer ||
         !module ||
+        !accredited ||
         operative.estado !== 'activo' ||
         operative.toleranciaMinutos === null ||
         !observer.activo ||
@@ -193,21 +208,11 @@ export class AttendancePersistence {
         content.expectedDate > operative.fechaFin
       )
         return reject('ineligible');
-      const [accreditation] = await tx
-        .select({ id: auditoria.id })
-        .from(auditoria)
-        .where(
-          and(
-            eq(auditoria.tipoEntidad, 'observadores'),
-            eq(auditoria.entidadId, observer.id),
-            eq(auditoria.accion, 'observers.account.linked'),
-            sql`JSON_UNQUOTE(JSON_EXTRACT(${auditoria.valoresNuevos}, '$.userId')) = ${current.user.id}`,
-            sql`JSON_UNQUOTE(JSON_EXTRACT(${auditoria.valoresNuevos}, '$.verificationMethod')) = 'supervised_administrative'`,
-          ),
-        )
-        .limit(1)
-        .for('share');
-      if (!accreditation) return reject('ineligible');
+      if (
+        receipt.fechaLocal !== content.expectedDate ||
+        localDate(receivedAt(Date.now())) !== content.expectedDate
+      )
+        return reject('day_changed');
       const [existing] = await tx
         .select({ id: registrosAsistencia.id })
         .from(registrosAsistencia)
@@ -221,6 +226,26 @@ export class AttendancePersistence {
         .limit(1)
         .for('update');
       if (existing) return reject('initial_mark_exists');
+      const [counterpart] = await tx
+        .select({ time: registrosAsistencia.registradoEn, state: registrosAsistencia.estado })
+        .from(registrosAsistencia)
+        .where(
+          and(
+            eq(registrosAsistencia.asignacionId, assignment.id),
+            eq(registrosAsistencia.fechaAsistencia, content.expectedDate),
+            eq(registrosAsistencia.tipo, content.type === 'entrada' ? 'salida' : 'entrada'),
+            eq(registrosAsistencia.vigente, 1),
+          ),
+        )
+        .for('update');
+      if (
+        content.type === 'entrada'
+          ? Boolean(counterpart)
+          : !counterpart ||
+            ['rejected', 'annulled'].includes(counterpart.state) ||
+            instantMicros(receipt.recibidoEn) <= instantMicros(counterpart.time)
+      )
+        return reject('invalid_order');
       const flags = timingFlags(
         receipt.recibidoEn,
         content.expectedDate,
