@@ -10,4 +10,4 @@ export type AuthUser = {
 };
 
 export type AuthContext = { user: AuthUser; sessionId: string };
-export type AuthRequest = Request & { auth?: AuthContext };
+export type AuthRequest = Request & { auth?: AuthContext; receivedAt?: string };

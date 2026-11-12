@@ -712,6 +712,54 @@ from scheduled hours. Working-day obligations, capture authorization and correct
 workflows require their own approved requirements; no placeholder capture implementation
 is included here.
 
+## Attendance persistence (Stage 2)
+
+`AttendanceModule` exports internal `AttendancePersistence.establish` and `complete`
+primitives and has no controller. `establish` authenticates/validates and commits a
+technical receipt; only then may `complete` create a mark. The authenticated request
+middleware attaches `receivedAt` before the JSON parser or authentication waits, using `Date.now()`
+milliseconds padded to six fractional digits. Future capture routes must pass this
+original request timestamp, never a new timestamp after waiting. A durable guarantee
+starts after receipt COMMIT. Same user/operation/exact key preserves the first committed
+receipt/content across session renewal; different validated content conflicts.
+
+The business transaction revalidates current authority/eligibility, locks resources
+in scheduling order, and commits attendance, audit and minimal receipt result together.
+Failure leaves a pending receipt; authorized terminal replay writes no new attendance
+or audit. Pending prior-day requests and requests crossing Mexico City midnight while
+processing reject before insertion under locks; this does not promise COMMIT before
+midnight. No background queue, leases or receipt TTL exists. The original content holds
+sensitive GPS; never log it or copy it into audit/results. SQL administration remains
+trusted: the internal primitives expose no original-evidence mutation operation; future
+review code must update decisions only and implement corrections as audited versions.
+
+Migration `0003_attendance_persistence.sql` adds `recibos_asistencia` and
+`registros_asistencia`, their RESTRICT FKs, CHECKs and unique keys. It preserves populated
+persistent assignments and the hashes of `0000`–`0002`. Scheduling now blocks cancellation,
+shortening or splitting that would invalidate any attendance version. A pending receipt
+does not pin a period. The schema supports manual historical provenance, correction
+versions and administrative decisions; those workflows remain unimplemented. No public
+capture/admin routes, frontend, selfie storage, Telegram, offline, closure or automatic
+absence generation is included. No Attendance permission provisioning runs in this stage.
+
+Tests: `test/attendance.test.mjs` and `test/attendance.integration.test.mjs` cover boundary
+timestamps, six-digit comparisons, durable receipts, concurrency, atomic audit rollback,
+replay, GPS/version constraints, midnight, historical assignment races and upgrade from
+populated `0002`. Integration fixtures use disposable `hhpaisanos_test_*` databases and
+synthetic runtime users against MySQL 8.4, never migrate the shared development database.
+
+Applying the migration to an existing database requires **separate explicit authorization**,
+a verified target configuration, backup and a maintenance window. Confirm MySQL 8.4,
+`0000`–`0002` tracked with their original hashes and `0002` persistent assignments already
+applied. Check that neither new table exists from a partial failed application. Use a
+migration account with CREATE/ALTER/INDEX/REFERENCES and migration-journal read/write
+privileges on the target database (no SUPER or server configuration change is needed).
+From the approved checkout, install frozen dependencies, then run
+`pnpm --filter @hhpaisanos/api db:check` (connectivity only) and, only after authorization,
+`pnpm --filter @hhpaisanos/api db:migrate`. MySQL DDL can partially apply; inspect failures
+before retrying. Review the migration journal, both new tables and unchanged assignments
+afterward. Do not rerun operative activation provisioning, bootstrap or role initialization.
+
 ## Git workflow
 
 - `main` is the stable, production-oriented branch; this initial foundation is
@@ -732,7 +780,7 @@ is included here.
 Health only reports process availability, not database or external-service
 readiness. Startup verifies MySQL connectivity and shutdown closes the pool.
 Backend authentication, permission guards, scoped account administration, observer
-profile administration, attention modules, persistent assignment management and operative creation/consultation/activation are implemented; other business workflows, frontend
+profile administration, attention modules, persistent assignment management, internal attendance persistence and operative creation/consultation/activation are implemented; other business workflows, frontend
 authentication, Telegram, deployment and CI/CD remain deferred. Persistence tables
 alone do not implement their workflows.
 

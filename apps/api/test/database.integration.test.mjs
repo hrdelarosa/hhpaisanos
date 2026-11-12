@@ -95,7 +95,7 @@ afterAll(async () => {
   }
 }, 30000);
 
-it('creates exactly the 11 approved tables and tracks the migration without reapplying it', async () => {
+it('creates exactly the 13 approved tables and tracks the migration without reapplying it', async () => {
   const [rows] = await service.db.execute(
     sql`SELECT table_name AS name FROM information_schema.tables WHERE table_schema = ${database}`,
   );
@@ -112,6 +112,8 @@ it('creates exactly the 11 approved tables and tracks the migration without reap
     'observadores',
     'operativos',
     'permisos',
+    'recibos_asistencia',
+    'registros_asistencia',
     'rol_permisos',
     'roles',
     'sesiones',

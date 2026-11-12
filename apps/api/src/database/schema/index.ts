@@ -4,3 +4,4 @@ export * from './auth/audit.js';
 export * from './observers/observers.js';
 export * from './operations/operations.js';
 export * from './operations/assignments.js';
+export * from './operations/attendance.js';

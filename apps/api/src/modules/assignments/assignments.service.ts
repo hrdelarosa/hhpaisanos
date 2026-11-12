@@ -13,6 +13,7 @@ import {
   modulosAtencion,
   observadores,
   operativos,
+  registrosAsistencia,
 } from '../../database/schema/index.js';
 import { AuthService } from '../auth/auth.service.js';
 import type { AuthContext } from '../auth/auth.types.js';
@@ -319,6 +320,7 @@ export class AssignmentsService {
           throw new ConflictException('Termination must preserve all elapsed dates');
         if (lastValidDate === assignment.vigenteHasta) return;
         this.requireOpenOperative(resources.operative);
+        await this.requirePreservedAttendance(tx, id, lastValidDate, false);
         await this.update(tx, assignment, { vigenteHasta: lastValidDate });
         await this.audit(
           tx,
@@ -334,6 +336,7 @@ export class AssignmentsService {
       if (assignment.vigenteDesde <= today)
         throw new ConflictException('Started assignments must be terminated, not cancelled');
       this.requireOpenOperative(resources.operative);
+      await this.requirePreservedAttendance(tx, id);
       await this.update(tx, assignment, { canceladaEn: sql`UTC_TIMESTAMP(6)` });
       const cancelled = await this.read(tx, id);
       await this.audit(
@@ -346,6 +349,32 @@ export class AssignmentsService {
         input.reason,
       );
     });
+  }
+
+  private async requirePreservedAttendance(
+    tx: Transaction,
+    id: string,
+    boundary?: string,
+    inclusive = true,
+  ) {
+    // The observer/assignment locks serialize this check with attendance insertion.
+    const [history] = await tx
+      .select({ id: registrosAsistencia.id })
+      .from(registrosAsistencia)
+      .where(
+        and(
+          eq(registrosAsistencia.asignacionId, id),
+          boundary === undefined
+            ? undefined
+            : inclusive
+              ? gte(registrosAsistencia.fechaAsistencia, boundary)
+              : sql`${registrosAsistencia.fechaAsistencia} > ${boundary}`,
+        ),
+      )
+      .limit(1)
+      .for('share');
+    if (history)
+      throw new ConflictException('Assignment change would invalidate historical attendance');
   }
 
   private async update(
@@ -401,6 +430,7 @@ export class AssignmentsService {
       assignment.id,
     );
     const replaceWhole = input.effectiveFrom === assignment.vigenteDesde;
+    await this.requirePreservedAttendance(tx, assignment.id, input.effectiveFrom);
     await this.update(
       tx,
       assignment,

@@ -141,7 +141,7 @@ Business rules:
 - Require nonblank reasons up to 500 Unicode code points for change, termination and cancellation. Require the current positive integer `expectedVersion`; increment on effective modification and reject stale versions with 409. No-ops change neither version/timestamps nor audit.
 - Require explicit `assignments:read`, `assignments:create`, `assignments:update` (change/termination) and `assignments:cancel`. ADMIN and ENLACE receive all four through centralized provisioning; OBSERVADOR receives none pending verified account/profile linking and ownership rules.
 - Revalidate mutation authority under transactional locks. Serialize scheduling through the observer row and atomically commit period changes/replacements with meaningful audit events.
-- Attendance/report tables remain deferred. Before enabling capture, daily records must reference the precise historical assignment period, include their own civil date, validate applicability and coordinate assignment locks. Never shorten a period past associated activity or silently transfer historical records.
+- Attendance references the precise historical assignment period and an explicit civil date. Capture and scheduling coordinate observer/assignment locks. Never shorten, cancel or split a period past associated attendance (including superseded, rejected or annulled versions), or transfer history. A pending technical receipt is not attendance. Attention report persistence remains deferred.
 
 ## 7. Attendance
 
@@ -159,7 +159,18 @@ The system must support:
 
 Daily attendance will reference a persistent assignment and an explicit attendance date; actual entry/exit instants are separate from scheduled hours. Assignment validity alone does not determine whether attendance was required that day or authorize capture. Working-day rules, capture policies and identity linking remain separate decisions.
 
-The precise review states, correction rules, tolerance policies, and location requirements remain pending confirmation.
+### Approved persistence contract (Stage 2)
+
+- Personal capture requires an active operative, explicit `attendance:capture-own`, an OBSERVADOR account and a server-resolved active observer with supervised administrative `observers.account.linked` audit evidence, an active module and an applicable historical assignment. ADMIN has no implicit observer grants.
+- Future attendance RBAC: OBSERVADOR `attendance:read-own`, `attendance:capture-own`; ADMIN/ENLACE `attendance:read`, `attendance:capture-manual`, `attendance:review`, `attendance:correct`, `attendance:annul`. Correction and review are separate permissions. Stage 2 does not provision these grants.
+- Use UTC instants and the civil date in `America/Mexico_City`. Capture `Date.now()` once before asynchronous authentication waits at the API boundary; persist only after authentication and input validation. Store actual measured milliseconds in DATETIME(6), padded with zeroes. Preserve all six supplied fractional digits when comparing instants; never manufacture measured microseconds.
+- Commit a minimal technical receipt before the attendance business transaction. Scope the exact idempotency key by authenticated user and operation, not session. Concurrent same-key requests establish one immutable original timestamp and validated normalized content, not necessarily the earliest network arrival. Different valid content conflicts. Recovery starts after the receipt COMMIT; no guarantee exists before it, and `creado_en` is a storage timestamp, not commit or receipt time.
+- The second transaction revalidates current authorization and eligibility under compatible resource locks. Attendance, audit and terminal receipt result commit atomically. Technical failure leaves the durable receipt pending; retry uses its original timestamp/content. Definitive business rejection can commit a terminal rejection without attendance. Authorized terminal replay returns the stored minimal result without a new mark or audit. No processing leases or background queue are required.
+- Bind the expected daily-context date into original content. Pending prior-day personal requests and requests crossing local midnight while processing are rejected under locks immediately before insertion. No silent date shift or guarantee that physical COMMIT precedes midnight. Completed replay after midnight creates nothing.
+- Personal marks with satisfied policy are `accepted_automatic`, meaning policy satisfaction, not verified physical presence. Late arrival, early departure and missing location can coexist and cause `pending_review`. Arrival tolerance is explicitly configured on the operative, initially 15 minutes, immutable after activation through the API; the threshold is inclusive. Early departure means before scheduled end. Store policy version; distinguish completeness, review status and calculated flags without daily summary/anomaly tables.
+- Future entry/exit UI must request GPS, but failure does not block a valid mark. Persist finite paired latitude/longitude and nonnegative accuracy, or one controlled missing-location reason: `permission_denied`, `position_unavailable`, `timeout`, `unsupported`, `insecure_context`, `unexpected_error`. Protect precise GPS from logs, audit and responses. Selfie is optional, and its absence is not an incident; no selfie storage in Stage 2.
+- States are `accepted_automatic`, `pending_review`, `accepted_administrative`, `rejected`, `annulled`. Corrections create a version with reason and predecessor, pending until an explicit administrative decision. Reviews preserve original evidence/event time. Authorized manual historical capture requires reason, audit and a valid assignment/date, including a closed operative without reopening it. Stage 2 models this provenance and decision evidence; it does not implement manual/review/correction/annulment workflows.
+- There is no destructive receipt TTL/cleanup without an approved retention policy. No automatic absences, daily assignments, public capture/administrative Attendance endpoints, frontend, Telegram, offline, operative closure or generic event infrastructure in Stage 2.
 
 ## 8. Attention reports
 
@@ -263,10 +274,10 @@ Exact report layouts, filters, exports, and dashboards must be defined against t
 
 ## 14. Pending functional decisions
 
-1. Attendance validation, rejection, correction, and annulment lifecycle.
+1. Public Attendance workflow implementation and detailed transition rules beyond the approved Stage 2 contract.
 2. Attention report draft, submission, review, correction, and annulment lifecycle.
-3. Geographic location and photographic evidence requirements.
-4. Rules for correcting assignments that already contain activity.
+3. Additional geographic verification and optional photographic evidence handling beyond the approved Stage 2 contract.
+4. Assignment/report history integrity beyond the attendance preservation rules above.
 5. Data retention.
 6. Exact access-control matrix for the new implementation.
 7. Official attention concepts and required reporting formats.
