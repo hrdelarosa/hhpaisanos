@@ -1,0 +1,1590 @@
+{
+  "version": "5",
+  "dialect": "mysql",
+  "id": "4e8b77d9-e637-42e2-9b70-a63f0ff73751",
+  "prevId": "4cab9a67-d060-4e6e-8b3e-0c4ed585bee9",
+  "tables": {
+    "permisos": {
+      "name": "permisos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "codigo": {
+          "name": "codigo",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "descripcion": {
+          "name": "descripcion",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "permisos_id": {
+          "name": "permisos_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {
+        "permisos_codigo_unique": {
+          "name": "permisos_codigo_unique",
+          "columns": ["codigo"]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "rol_permisos": {
+      "name": "rol_permisos",
+      "columns": {
+        "rol_id": {
+          "name": "rol_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "permiso_id": {
+          "name": "permiso_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rol_permisos_rol_id_roles_id_fk": {
+          "name": "rol_permisos_rol_id_roles_id_fk",
+          "tableFrom": "rol_permisos",
+          "tableTo": "roles",
+          "columnsFrom": ["rol_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "rol_permisos_permiso_id_permisos_id_fk": {
+          "name": "rol_permisos_permiso_id_permisos_id_fk",
+          "tableFrom": "rol_permisos",
+          "tableTo": "permisos",
+          "columnsFrom": ["permiso_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "rol_permisos_rol_id_permiso_id_pk": {
+          "name": "rol_permisos_rol_id_permiso_id_pk",
+          "columns": ["rol_id", "permiso_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "roles": {
+      "name": "roles",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "codigo": {
+          "name": "codigo",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "descripcion": {
+          "name": "descripcion",
+          "type": "varchar(355)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "roles_id": {
+          "name": "roles_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {
+        "roles_codigo_unique": {
+          "name": "roles_codigo_unique",
+          "columns": ["codigo"]
+        }
+      },
+      "checkConstraint": {
+        "roles_activo_check": {
+          "name": "roles_activo_check",
+          "value": "`roles`.`activo` IN (0, 1)"
+        }
+      }
+    },
+    "usuarios": {
+      "name": "usuarios",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rol_id": {
+          "name": "rol_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nombre_usuario": {
+          "name": "nombre_usuario",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nombre_completo": {
+          "name": "nombre_completo",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "debe_cambiar_password": {
+          "name": "debe_cambiar_password",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_cambiada_en": {
+          "name": "password_cambiada_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "intentos_fallidos": {
+          "name": "intentos_fallidos",
+          "type": "smallint unsigned",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "bloqueado_hasta": {
+          "name": "bloqueado_hasta",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ultimo_acceso_en": {
+          "name": "ultimo_acceso_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {
+        "usuarios_rol_activo_idx": {
+          "name": "usuarios_rol_activo_idx",
+          "columns": ["rol_id", "activo"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "usuarios_rol_id_roles_id_fk": {
+          "name": "usuarios_rol_id_roles_id_fk",
+          "tableFrom": "usuarios",
+          "tableTo": "roles",
+          "columnsFrom": ["rol_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "usuarios_id": {
+          "name": "usuarios_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {
+        "usuarios_nombre_usuario_unique": {
+          "name": "usuarios_nombre_usuario_unique",
+          "columns": ["nombre_usuario"]
+        }
+      },
+      "checkConstraint": {
+        "usuarios_activo_check": {
+          "name": "usuarios_activo_check",
+          "value": "`usuarios`.`activo` IN (0, 1)"
+        },
+        "usuarios_cambiar_password_check": {
+          "name": "usuarios_cambiar_password_check",
+          "value": "`usuarios`.`debe_cambiar_password` IN (0, 1)"
+        }
+      }
+    },
+    "sesiones": {
+      "name": "sesiones",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "char(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ultima_actividad_en": {
+          "name": "ultima_actividad_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expira_por_inactividad_en": {
+          "name": "expira_por_inactividad_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "expira_en_absoluto": {
+          "name": "expira_en_absoluto",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revocada_en": {
+          "name": "revocada_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revocada_por": {
+          "name": "revocada_por",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "motivo_revocacion": {
+          "name": "motivo_revocacion",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ip": {
+          "name": "ip",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {
+        "sesiones_usuario_idx": {
+          "name": "sesiones_usuario_idx",
+          "columns": ["usuario_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "sesiones_usuario_id_usuarios_id_fk": {
+          "name": "sesiones_usuario_id_usuarios_id_fk",
+          "tableFrom": "sesiones",
+          "tableTo": "usuarios",
+          "columnsFrom": ["usuario_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "sesiones_revocada_por_usuarios_id_fk": {
+          "name": "sesiones_revocada_por_usuarios_id_fk",
+          "tableFrom": "sesiones",
+          "tableTo": "usuarios",
+          "columnsFrom": ["revocada_por"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "sesiones_id": {
+          "name": "sesiones_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {
+        "sesiones_token_hash_unique": {
+          "name": "sesiones_token_hash_unique",
+          "columns": ["token_hash"]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "auditoria": {
+      "name": "auditoria",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sesion_id": {
+          "name": "sesion_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "accion": {
+          "name": "accion",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tipo_entidad": {
+          "name": "tipo_entidad",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entidad_id": {
+          "name": "entidad_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "valores_anteriores": {
+          "name": "valores_anteriores",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "valores_nuevos": {
+          "name": "valores_nuevos",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "motivo": {
+          "name": "motivo",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "canal": {
+          "name": "canal",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ip": {
+          "name": "ip",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {
+        "auditoria_entidad_idx": {
+          "name": "auditoria_entidad_idx",
+          "columns": ["tipo_entidad", "entidad_id"],
+          "isUnique": false
+        },
+        "auditoria_usuario_fecha_idx": {
+          "name": "auditoria_usuario_fecha_idx",
+          "columns": ["usuario_id", "creado_en"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "auditoria_usuario_id_usuarios_id_fk": {
+          "name": "auditoria_usuario_id_usuarios_id_fk",
+          "tableFrom": "auditoria",
+          "tableTo": "usuarios",
+          "columnsFrom": ["usuario_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "auditoria_sesion_id_sesiones_id_fk": {
+          "name": "auditoria_sesion_id_sesiones_id_fk",
+          "tableFrom": "auditoria",
+          "tableTo": "sesiones",
+          "columnsFrom": ["sesion_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "auditoria_id": {
+          "name": "auditoria_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "observadores": {
+      "name": "observadores",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nombres": {
+          "name": "nombres",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "apellidos": {
+          "name": "apellidos",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "telefono": {
+          "name": "telefono",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "observadores_usuario_id_usuarios_id_fk": {
+          "name": "observadores_usuario_id_usuarios_id_fk",
+          "tableFrom": "observadores",
+          "tableTo": "usuarios",
+          "columnsFrom": ["usuario_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "observadores_id": {
+          "name": "observadores_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {
+        "observadores_usuario_id_unique": {
+          "name": "observadores_usuario_id_unique",
+          "columns": ["usuario_id"]
+        }
+      },
+      "checkConstraint": {
+        "observadores_activo_check": {
+          "name": "observadores_activo_check",
+          "value": "`observadores`.`activo` IN (0, 1)"
+        }
+      }
+    },
+    "conceptos_atencion": {
+      "name": "conceptos_atencion",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "clave": {
+          "name": "clave",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "orden": {
+          "name": "orden",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requiere_especificacion": {
+          "name": "requiere_especificacion",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "conceptos_atencion_id": {
+          "name": "conceptos_atencion_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {
+        "conceptos_atencion_clave_unique": {
+          "name": "conceptos_atencion_clave_unique",
+          "columns": ["clave"]
+        }
+      },
+      "checkConstraint": {
+        "conceptos_especificacion_check": {
+          "name": "conceptos_especificacion_check",
+          "value": "`conceptos_atencion`.`requiere_especificacion` IN (0, 1)"
+        },
+        "conceptos_activo_check": {
+          "name": "conceptos_activo_check",
+          "value": "`conceptos_atencion`.`activo` IN (0, 1)"
+        }
+      }
+    },
+    "modulos_atencion": {
+      "name": "modulos_atencion",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "municipio": {
+          "name": "municipio",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "latitud": {
+          "name": "latitud",
+          "type": "decimal(9,6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "longitud": {
+          "name": "longitud",
+          "type": "decimal(9,6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "radio_validacion_m": {
+          "name": "radio_validacion_m",
+          "type": "smallint unsigned",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "modulos_atencion_id": {
+          "name": "modulos_atencion_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "modulos_coordenadas_pares_check": {
+          "name": "modulos_coordenadas_pares_check",
+          "value": "(`modulos_atencion`.`latitud` IS NULL AND `modulos_atencion`.`longitud` IS NULL) OR (`modulos_atencion`.`latitud` IS NOT NULL AND `modulos_atencion`.`longitud` IS NOT NULL)"
+        },
+        "modulos_latitud_check": {
+          "name": "modulos_latitud_check",
+          "value": "`modulos_atencion`.`latitud` BETWEEN -90 AND 90"
+        },
+        "modulos_longitud_check": {
+          "name": "modulos_longitud_check",
+          "value": "`modulos_atencion`.`longitud` BETWEEN -180 AND 180"
+        },
+        "modulos_activo_check": {
+          "name": "modulos_activo_check",
+          "value": "`modulos_atencion`.`activo` IN (0, 1)"
+        }
+      }
+    },
+    "operativos": {
+      "name": "operativos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fecha_inicio": {
+          "name": "fecha_inicio",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fecha_fin": {
+          "name": "fecha_fin",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "estado": {
+          "name": "estado",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tolerancia_minutos": {
+          "name": "tolerancia_minutos",
+          "type": "smallint unsigned",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "precision_maxima_m": {
+          "name": "precision_maxima_m",
+          "type": "smallint unsigned",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {
+        "operativos_nombre_fechas_unique": {
+          "name": "operativos_nombre_fechas_unique",
+          "columns": ["nombre", "fecha_inicio", "fecha_fin"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "operativos_id": {
+          "name": "operativos_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "operativos_fechas_check": {
+          "name": "operativos_fechas_check",
+          "value": "`operativos`.`fecha_inicio` <= `operativos`.`fecha_fin`"
+        },
+        "operativos_estado_check": {
+          "name": "operativos_estado_check",
+          "value": "`operativos`.`estado` IN ('borrador', 'activo', 'cerrado')"
+        }
+      }
+    },
+    "asignaciones": {
+      "name": "asignaciones",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "operativo_id": {
+          "name": "operativo_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "observador_id": {
+          "name": "observador_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "modulo_id": {
+          "name": "modulo_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "vigente_desde": {
+          "name": "vigente_desde",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "vigente_hasta": {
+          "name": "vigente_hasta",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version_bloqueo": {
+          "name": "version_bloqueo",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "hora_inicio": {
+          "name": "hora_inicio",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hora_fin": {
+          "name": "hora_fin",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cancelada_en": {
+          "name": "cancelada_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "activa": {
+          "name": "activa",
+          "type": "tinyint",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "CASE WHEN cancelada_en IS NULL THEN 1 ELSE NULL END",
+            "type": "stored"
+          }
+        },
+        "creado_por": {
+          "name": "creado_por",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        },
+        "actualizado_en": {
+          "name": "actualizado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {
+        "asignaciones_activa_unique": {
+          "name": "asignaciones_activa_unique",
+          "columns": [
+            "operativo_id",
+            "observador_id",
+            "modulo_id",
+            "vigente_desde",
+            "vigente_hasta",
+            "hora_inicio",
+            "hora_fin",
+            "activa"
+          ],
+          "isUnique": true
+        },
+        "asignaciones_observador_vigencia_idx": {
+          "name": "asignaciones_observador_vigencia_idx",
+          "columns": ["observador_id", "vigente_desde", "vigente_hasta"],
+          "isUnique": false
+        },
+        "asignaciones_modulo_vigencia_idx": {
+          "name": "asignaciones_modulo_vigencia_idx",
+          "columns": ["modulo_id", "vigente_desde", "vigente_hasta"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "asignaciones_operativo_id_operativos_id_fk": {
+          "name": "asignaciones_operativo_id_operativos_id_fk",
+          "tableFrom": "asignaciones",
+          "tableTo": "operativos",
+          "columnsFrom": ["operativo_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "asignaciones_observador_id_observadores_id_fk": {
+          "name": "asignaciones_observador_id_observadores_id_fk",
+          "tableFrom": "asignaciones",
+          "tableTo": "observadores",
+          "columnsFrom": ["observador_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "asignaciones_modulo_id_modulos_atencion_id_fk": {
+          "name": "asignaciones_modulo_id_modulos_atencion_id_fk",
+          "tableFrom": "asignaciones",
+          "tableTo": "modulos_atencion",
+          "columnsFrom": ["modulo_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "asignaciones_creado_por_usuarios_id_fk": {
+          "name": "asignaciones_creado_por_usuarios_id_fk",
+          "tableFrom": "asignaciones",
+          "tableTo": "usuarios",
+          "columnsFrom": ["creado_por"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "asignaciones_id": {
+          "name": "asignaciones_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "asignaciones_vigencia_check": {
+          "name": "asignaciones_vigencia_check",
+          "value": "`asignaciones`.`vigente_desde` <= `asignaciones`.`vigente_hasta`"
+        },
+        "asignaciones_version_check": {
+          "name": "asignaciones_version_check",
+          "value": "`asignaciones`.`version_bloqueo` > 0"
+        },
+        "asignaciones_horario_check": {
+          "name": "asignaciones_horario_check",
+          "value": "`asignaciones`.`hora_inicio` >= '00:00:00' AND `asignaciones`.`hora_fin` <= '23:59:59' AND `asignaciones`.`hora_fin` > `asignaciones`.`hora_inicio`"
+        }
+      }
+    },
+    "recibos_asistencia": {
+      "name": "recibos_asistencia",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sesion_id": {
+          "name": "sesion_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "operacion": {
+          "name": "operacion",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "clave": {
+          "name": "clave",
+          "type": "varchar(128) COLLATE utf8mb4_0900_bin",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "recibido_en": {
+          "name": "recibido_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fecha_local": {
+          "name": "fecha_local",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contenido": {
+          "name": "contenido",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "estado": {
+          "name": "estado",
+          "type": "varchar(12)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "resultado": {
+          "name": "resultado",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {
+        "recibos_scope_unique": {
+          "name": "recibos_scope_unique",
+          "columns": ["usuario_id", "operacion", "clave"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "recibos_asistencia_usuario_id_usuarios_id_fk": {
+          "name": "recibos_asistencia_usuario_id_usuarios_id_fk",
+          "tableFrom": "recibos_asistencia",
+          "tableTo": "usuarios",
+          "columnsFrom": ["usuario_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "recibos_asistencia_sesion_id_sesiones_id_fk": {
+          "name": "recibos_asistencia_sesion_id_sesiones_id_fk",
+          "tableFrom": "recibos_asistencia",
+          "tableTo": "sesiones",
+          "columnsFrom": ["sesion_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "recibos_asistencia_id": {
+          "name": "recibos_asistencia_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "recibos_resultado_check": {
+          "name": "recibos_resultado_check",
+          "value": "(`recibos_asistencia`.`estado` = 'pending' AND `recibos_asistencia`.`resultado` IS NULL) OR (`recibos_asistencia`.`estado` IN ('completed', 'rejected') AND `recibos_asistencia`.`resultado` IS NOT NULL AND JSON_TYPE(`recibos_asistencia`.`resultado`) = 'OBJECT')"
+        }
+      }
+    },
+    "registros_asistencia": {
+      "name": "registros_asistencia",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "asignacion_id": {
+          "name": "asignacion_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fecha_asistencia": {
+          "name": "fecha_asistencia",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "vigente": {
+          "name": "vigente",
+          "type": "tinyint",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 1
+        },
+        "registrado_en": {
+          "name": "registrado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "registrado_por": {
+          "name": "registrado_por",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "canal": {
+          "name": "canal",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "recibo_id": {
+          "name": "recibo_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "anterior_id": {
+          "name": "anterior_id",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "latitud": {
+          "name": "latitud",
+          "type": "decimal(9,6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "longitud": {
+          "name": "longitud",
+          "type": "decimal(9,6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "precision_m": {
+          "name": "precision_m",
+          "type": "decimal(13,6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "motivo_sin_ubicacion": {
+          "name": "motivo_sin_ubicacion",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "estado": {
+          "name": "estado",
+          "type": "varchar(24)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "llegada_tardia": {
+          "name": "llegada_tardia",
+          "type": "tinyint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "salida_temprana": {
+          "name": "salida_temprana",
+          "type": "tinyint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "politica_version": {
+          "name": "politica_version",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "motivo_captura_manual": {
+          "name": "motivo_captura_manual",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "motivo_correccion": {
+          "name": "motivo_correccion",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revisado_por": {
+          "name": "revisado_por",
+          "type": "binary(16)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revisado_en": {
+          "name": "revisado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "motivo_decision": {
+          "name": "motivo_decision",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "datetime(6)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(6))"
+        }
+      },
+      "indexes": {
+        "asistencia_version_unique": {
+          "name": "asistencia_version_unique",
+          "columns": ["asignacion_id", "fecha_asistencia", "tipo", "version"],
+          "isUnique": true
+        },
+        "asistencia_vigente_unique": {
+          "name": "asistencia_vigente_unique",
+          "columns": ["asignacion_id", "fecha_asistencia", "tipo", "vigente"],
+          "isUnique": true
+        },
+        "asistencia_recibo_unique": {
+          "name": "asistencia_recibo_unique",
+          "columns": ["recibo_id"],
+          "isUnique": true
+        },
+        "asistencia_anterior_unique": {
+          "name": "asistencia_anterior_unique",
+          "columns": ["anterior_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "registros_asistencia_asignacion_id_asignaciones_id_fk": {
+          "name": "registros_asistencia_asignacion_id_asignaciones_id_fk",
+          "tableFrom": "registros_asistencia",
+          "tableTo": "asignaciones",
+          "columnsFrom": ["asignacion_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "registros_asistencia_registrado_por_usuarios_id_fk": {
+          "name": "registros_asistencia_registrado_por_usuarios_id_fk",
+          "tableFrom": "registros_asistencia",
+          "tableTo": "usuarios",
+          "columnsFrom": ["registrado_por"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "registros_asistencia_recibo_id_recibos_asistencia_id_fk": {
+          "name": "registros_asistencia_recibo_id_recibos_asistencia_id_fk",
+          "tableFrom": "registros_asistencia",
+          "tableTo": "recibos_asistencia",
+          "columnsFrom": ["recibo_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "registros_asistencia_anterior_id_registros_asistencia_id_fk": {
+          "name": "registros_asistencia_anterior_id_registros_asistencia_id_fk",
+          "tableFrom": "registros_asistencia",
+          "tableTo": "registros_asistencia",
+          "columnsFrom": ["anterior_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "registros_asistencia_revisado_por_usuarios_id_fk": {
+          "name": "registros_asistencia_revisado_por_usuarios_id_fk",
+          "tableFrom": "registros_asistencia",
+          "tableTo": "usuarios",
+          "columnsFrom": ["revisado_por"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "registros_asistencia_id": {
+          "name": "registros_asistencia_id",
+          "columns": ["id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "asistencia_tipo_check": {
+          "name": "asistencia_tipo_check",
+          "value": "`registros_asistencia`.`tipo` IN ('entrada', 'salida')"
+        },
+        "asistencia_version_check": {
+          "name": "asistencia_version_check",
+          "value": "`registros_asistencia`.`version` > 0 AND (`registros_asistencia`.`vigente` IS NULL OR `registros_asistencia`.`vigente` = 1) AND (`registros_asistencia`.`version` = 1 OR `registros_asistencia`.`estado` <> 'accepted_automatic')"
+        },
+        "asistencia_procedencia_check": {
+          "name": "asistencia_procedencia_check",
+          "value": "(`registros_asistencia`.`version` = 1 AND `registros_asistencia`.`anterior_id` IS NULL AND `registros_asistencia`.`motivo_correccion` IS NULL) OR (`registros_asistencia`.`version` > 1 AND `registros_asistencia`.`anterior_id` IS NOT NULL AND `registros_asistencia`.`motivo_correccion` IS NOT NULL AND CHAR_LENGTH(TRIM(`registros_asistencia`.`motivo_correccion`)) > 0 AND `registros_asistencia`.`recibo_id` IS NULL)"
+        },
+        "asistencia_canal_check": {
+          "name": "asistencia_canal_check",
+          "value": "`registros_asistencia`.`canal` IN ('web', 'manual') AND (`registros_asistencia`.`canal` <> 'manual' OR (`registros_asistencia`.`motivo_captura_manual` IS NOT NULL AND CHAR_LENGTH(TRIM(`registros_asistencia`.`motivo_captura_manual`)) > 0 AND `registros_asistencia`.`recibo_id` IS NULL)) AND (`registros_asistencia`.`version` <> 1 OR `registros_asistencia`.`canal` <> 'web' OR `registros_asistencia`.`recibo_id` IS NOT NULL)"
+        },
+        "asistencia_ubicacion_check": {
+          "name": "asistencia_ubicacion_check",
+          "value": "(`registros_asistencia`.`latitud` IS NOT NULL AND `registros_asistencia`.`longitud` IS NOT NULL AND `registros_asistencia`.`precision_m` IS NOT NULL AND `registros_asistencia`.`latitud` BETWEEN -90 AND 90 AND `registros_asistencia`.`longitud` BETWEEN -180 AND 180 AND `registros_asistencia`.`precision_m` >= 0 AND `registros_asistencia`.`motivo_sin_ubicacion` IS NULL) OR (`registros_asistencia`.`latitud` IS NULL AND `registros_asistencia`.`longitud` IS NULL AND `registros_asistencia`.`precision_m` IS NULL AND `registros_asistencia`.`motivo_sin_ubicacion` IS NOT NULL AND `registros_asistencia`.`motivo_sin_ubicacion` IN ('permission_denied', 'position_unavailable', 'timeout', 'unsupported', 'insecure_context', 'unexpected_error'))"
+        },
+        "asistencia_estado_check": {
+          "name": "asistencia_estado_check",
+          "value": "`registros_asistencia`.`estado` IN ('accepted_automatic', 'pending_review', 'accepted_administrative', 'rejected', 'annulled')"
+        },
+        "asistencia_alertas_check": {
+          "name": "asistencia_alertas_check",
+          "value": "`registros_asistencia`.`llegada_tardia` IN (0, 1) AND `registros_asistencia`.`salida_temprana` IN (0, 1) AND (`registros_asistencia`.`estado` <> 'accepted_automatic' OR (`registros_asistencia`.`llegada_tardia` = 0 AND `registros_asistencia`.`salida_temprana` = 0 AND `registros_asistencia`.`motivo_sin_ubicacion` IS NULL))"
+        },
+        "asistencia_decision_check": {
+          "name": "asistencia_decision_check",
+          "value": "(`registros_asistencia`.`revisado_por` IS NULL AND `registros_asistencia`.`revisado_en` IS NULL AND `registros_asistencia`.`motivo_decision` IS NULL AND `registros_asistencia`.`estado` IN ('accepted_automatic', 'pending_review')) OR (`registros_asistencia`.`revisado_por` IS NOT NULL AND `registros_asistencia`.`revisado_en` IS NOT NULL AND `registros_asistencia`.`motivo_decision` IS NOT NULL AND CHAR_LENGTH(TRIM(`registros_asistencia`.`motivo_decision`)) > 0 AND `registros_asistencia`.`estado` IN ('accepted_administrative', 'rejected', 'annulled'))"
+        }
+      }
+    }
+  },
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {},
+    "indexes": {}
+  }
+}

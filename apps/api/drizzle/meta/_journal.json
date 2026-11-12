@@ -22,6 +22,13 @@
       "when": 1794201972504,
       "tag": "0002_persistent_assignments",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1794520970347,
+      "tag": "0003_attendance_persistence",
+      "breakpoints": true
     }
   ]
 }

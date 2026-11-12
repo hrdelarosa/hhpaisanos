@@ -119,20 +119,26 @@ Check coordinate ranges and require both coordinates present or both absent. GPS
 
 ## 7. Attendance with correction history
 
+Migration `0003_attendance_persistence` adds the following two tables without modifying assignments or prior migrations. All foreign keys use RESTRICT. The former proposed Spanish review statuses are superseded by the approved contract in REQUIREMENTS section 7.
+
+### `recibos_asistencia`
+`id`; `usuario_id FK`; original `sesion_id FK`; `operacion VARCHAR(40)`; `clave VARCHAR(128) COLLATE utf8mb4_0900_bin`; `recibido_en DATETIME(6)`; `fecha_local DATE`; validated original `contenido JSON`; `estado VARCHAR(12)` (`pending`, `completed`, `rejected`); minimal nullable terminal `resultado JSON`; storage `creado_en DATETIME(6)`.
+
+- Unique (`usuario_id`, `operacion`, `clave`) is the concurrency authority. Keys are exact, case-sensitive printable ASCII; scope survives session renewal. Normalized content uses fixed properties and server-resolved identity, not a client observer ID. A conflicting validated request cannot replace the original content/time.
+- CHECK requires pending/null result or terminal/non-null JSON object. The internal service only updates state/result once while holding a receipt lock. It exposes no evidence update/delete operation. SQL access remains a trusted administration boundary; future review paths must retain this rule.
+- The receipt is a technical request, not attendance or success. Its own transaction must COMMIT before business processing. Storage time is neither receipt time nor commit time. Node milliseconds have three trailing zeroes; supplied six-digit instants are compared without JS Date truncation.
+- No cleanup/TTL. GPS in original content is sensitive: do not include it in audit, logs or results. Business failures roll back independently of the receipt; retries use the same original timestamp. Terminal results replay only after renewed authorization.
+
 ### `registros_asistencia`
-`id`; `asignacion_id FK`; `fecha_asistencia DATE`; `tipo VARCHAR(10)` (`entrada`, `salida`); `version INT UNSIGNED` (starts at 1); `vigente BOOLEAN NULL` (`1` for current, `NULL` for superseded); `registrado_en DATETIME(6)`; `latitud DECIMAL(9,6) NULL`; `longitud DECIMAL(9,6) NULL`; `precision_m DECIMAL(10,3) NULL`; `canal VARCHAR(20)` (`manual`, `web`, future `telegram`); `registrado_por FK usuarios`; `motivo_captura_manual VARCHAR(500) NULL`; `estado VARCHAR(20)` (`verificada`, `por_revisar`, `aceptada`, `rechazada`); `alertas JSON`; `revisado_por FK usuarios NULL`; `revisado_en DATETIME(6) NULL`; `observaciones VARCHAR(500) NULL`; `motivo_correccion VARCHAR(500) NULL`; timestamps.
+`id`; historical `asignacion_id FK`; `fecha_asistencia DATE`; `tipo VARCHAR(10)` (`entrada`, `salida`); positive `version INT UNSIGNED`; `vigente TINYINT NULL` (`1` current, `NULL` superseded); original `registrado_en DATETIME(6)`; `registrado_por FK`; `canal VARCHAR(20)` (`web`, `manual`); original-only nullable `recibo_id FK`; nullable `anterior_id FK`; `latitud/longitud DECIMAL(9,6)`; `precision_m DECIMAL(13,6)`; controlled nullable `motivo_sin_ubicacion`; `estado VARCHAR(24)`; boolean flags `llegada_tardia`, `salida_temprana`; `politica_version`; optional manual/correction reasons; decision actor/time/reason; storage `creado_en`.
 
-Indexes/constraints:
-- Unique (`asignacion_id`, `fecha_asistencia`, `tipo`, `version`).
-- Unique (`asignacion_id`, `fecha_asistencia`, `tipo`, `vigente`) where historical rows have `vigente = NULL` and the current row has `vigente = 1`.
-- `CHECK (vigente IS NULL OR vigente = 1)`; version positive; coordinates valid and paired; precision nonnegative.
-- A new corrected mark is inserted at a higher version while the previous version becomes non-current, in one transaction with audit; do not modify original marked time in place.
-- A duplicate initial `entrada`/`salida` is rejected rather than silently creating version 2. Versions are created only through an authorized correction procedure.
-- A rejected mark remains as evidence; whether it can be replaced or annulled requires an explicit functional policy.
-
-**Important distinction:** `registrado_en` is when the attendance occurred (server receipt for remote capture; reported time for an authorized late manual entry), while `creado_en` is when this version was stored. Use a separate recorded timestamp only if the actual channel requires a different event time.
-
-**Status semantics retained pending confirmation:** `verificada` represents automatic rule-based verification, `por_revisar` pending human review, `aceptada` human acceptance, and `rechazada` human rejection. The original policy states manual entries are initially accepted and observer entries require review; ensure the exact transition table is confirmed before implementation.
+- Unique (`asignacion_id`, `fecha_asistencia`, `tipo`, `version`) and (`asignacion_id`, `fecha_asistencia`, `tipo`, `vigente`). Only initial capture creates version 1; duplicate initial marks conflict even across distinct request keys. Corrections must never be inferred from retries.
+- Unique nullable `recibo_id` attaches a receipt only to the ORIGINAL personal mark. A correction has no direct receipt FK; its unique predecessor link preserves historical provenance back to the original receipt without duplicating that FK.
+- CHECKs enforce type, positive version, 1/NULL currentness, initial versus correction provenance/reason, manual reason with no receipt, original web receipt, valid paired GPS plus nonnegative accuracy OR controlled missing-location reason, allowed states, boolean flags, and complete administrative decision evidence. Automatic acceptance cannot coexist with late/early/missing-location flags or correction versions.
+- States: `accepted_automatic`, `pending_review`, `accepted_administrative`, `rejected`, `annulled`. Automatic acceptance establishes policy satisfaction only. Missing location can coexist with late arrival or early departure. No anomaly or daily summary table.
+- Future authorized correction transactions must validate the predecessor belongs to the same assignment/date/type and next version, retire its currentness, create a pending version and audit atomically. A later explicit review may update only decision fields/status; never event time or original evidence. These workflows are not exposed in Stage 2.
+- `registrado_en` is the original server receipt time for personal capture or reported historical event time for authorized manual capture. `creado_en` is storage time. Future manual historical capture may use a closed operative without reopening it, provided assignment/date remain valid and a reason/audit is recorded.
+- Business capture locks current auth actor, operative SHARE, observer UPDATE, module SHARE, assignment UPDATE, then receipt UPDATE. Scheduling uses the same parent order and rejects shortening/cancellation/splitting that would invalidate ANY stored attendance version, including annulled records. Pending receipts do not reserve assignments. Validate eligibility again before completing them.
 
 ## 8. Attention reports with correction history
 

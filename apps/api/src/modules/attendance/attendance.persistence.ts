@@ -1,0 +1,288 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  HttpException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { and, eq, sql } from 'drizzle-orm';
+import { DatabaseService } from '../../database/database.service.js';
+import {
+  asignaciones,
+  auditoria,
+  modulosAtencion,
+  observadores,
+  operativos,
+  recibosAsistencia,
+  registrosAsistencia,
+  type AttendanceResult,
+} from '../../database/schema/index.js';
+import { AuthService } from '../auth/auth.service.js';
+import type { AuthContext } from '../auth/auth.types.js';
+import { normalizeMark, type PersonalMark } from './attendance-input.js';
+import { instantMicros, localDate, receivedAt, timingFlags } from './attendance-time.js';
+
+type Transaction = Parameters<Parameters<DatabaseService['db']['transaction']>[0]>[0];
+const operation = 'attendance.capture-own';
+const policyVersion = 'personal-v1';
+
+/** Internal only: callers must pass the authenticated request boundary timestamp. */
+@Injectable()
+export class AttendancePersistence {
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly auth: AuthService,
+  ) {}
+
+  private async transaction<T>(work: (tx: Transaction) => Promise<T>): Promise<T> {
+    try {
+      return await this.database.db.transaction(work);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      const driver = error instanceof Error && error.cause ? error.cause : error;
+      if (
+        typeof driver === 'object' &&
+        driver !== null &&
+        'code' in driver &&
+        ['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT', 'ER_DUP_ENTRY'].includes(String(driver.code))
+      )
+        throw new ConflictException('Concurrent attendance operation; retry with the same key');
+      // Driver errors include SQL parameters, including GPS. Never expose or log them.
+      throw new InternalServerErrorException('Attendance persistence failed');
+    }
+  }
+
+  private async authorize(tx: Transaction, context: AuthContext) {
+    const current = await this.auth.requireCurrentContext(tx, context);
+    if (
+      current.user.role !== 'OBSERVADOR' ||
+      !current.user.permissions.includes('attendance:capture-own')
+    )
+      throw new ForbiddenException('Insufficient permissions');
+    return current;
+  }
+
+  async establish(
+    context: AuthContext,
+    key: string,
+    input: PersonalMark,
+    boundaryTimestamp: string,
+  ): Promise<string> {
+    if (typeof key !== 'string' || !/^[!-~]{1,128}$/.test(key))
+      throw new BadRequestException('Invalid idempotency key');
+    const content = normalizeMark(input);
+    try {
+      instantMicros(boundaryTimestamp);
+      if (!boundaryTimestamp.endsWith('000')) throw new Error('Not measured milliseconds');
+    } catch {
+      throw new BadRequestException('Invalid request boundary timestamp');
+    }
+    return this.transaction(async (tx) => {
+      const current = await this.authorize(tx, context);
+      // The unique index is the authority even when no receipt existed at the first read.
+      await tx
+        .insert(recibosAsistencia)
+        .values({
+          usuarioId: current.user.id,
+          sesionId: current.sessionId,
+          operacion: operation,
+          clave: key,
+          recibidoEn: boundaryTimestamp,
+          fechaLocal: localDate(boundaryTimestamp),
+          contenido: content,
+        })
+        .onDuplicateKeyUpdate({ set: { id: sql`${recibosAsistencia.id}` } });
+      const [receipt] = await tx
+        .select()
+        .from(recibosAsistencia)
+        .where(
+          and(
+            eq(recibosAsistencia.usuarioId, current.user.id),
+            eq(recibosAsistencia.operacion, operation),
+            eq(recibosAsistencia.clave, key),
+          ),
+        )
+        .for('update');
+      if (
+        JSON.stringify(normalizeMark(receipt.contenido as PersonalMark)) !== JSON.stringify(content)
+      )
+        throw new ConflictException('Idempotency key content conflict');
+      return receipt.id;
+    });
+  }
+
+  async complete(context: AuthContext, receiptId: string): Promise<AttendanceResult> {
+    return this.transaction(async (tx) => {
+      const current = await this.authorize(tx, context);
+      const [reference] = await tx
+        .select()
+        .from(recibosAsistencia)
+        .where(
+          and(
+            eq(recibosAsistencia.id, receiptId),
+            eq(recibosAsistencia.usuarioId, current.user.id),
+            eq(recibosAsistencia.operacion, operation),
+          ),
+        );
+      if (!reference) throw new NotFoundException('Receipt not found');
+      const content = normalizeMark(reference.contenido as PersonalMark);
+      const [assignmentReference] = await tx
+        .select()
+        .from(asignaciones)
+        .where(eq(asignaciones.id, content.assignmentId));
+
+      // Match scheduling: actor, operative SHARE, observer UPDATE, module SHARE,
+      // assignment UPDATE, then receipt UPDATE. A pending receipt owns no assignment.
+      let operative: typeof operativos.$inferSelect | undefined;
+      let observer: typeof observadores.$inferSelect | undefined;
+      let module: typeof modulosAtencion.$inferSelect | undefined;
+      let assignment: typeof asignaciones.$inferSelect | undefined;
+      if (assignmentReference) {
+        [operative] = await tx
+          .select()
+          .from(operativos)
+          .where(eq(operativos.id, assignmentReference.operativoId))
+          .for('share');
+        [observer] = await tx
+          .select()
+          .from(observadores)
+          .where(eq(observadores.id, assignmentReference.observadorId))
+          .for('update');
+        [module] = await tx
+          .select()
+          .from(modulosAtencion)
+          .where(eq(modulosAtencion.id, assignmentReference.moduloId))
+          .for('share');
+        [assignment] = await tx
+          .select()
+          .from(asignaciones)
+          .where(eq(asignaciones.id, content.assignmentId))
+          .for('update');
+      }
+      const [receipt] = await tx
+        .select()
+        .from(recibosAsistencia)
+        .where(eq(recibosAsistencia.id, receiptId))
+        .for('update');
+      // Replay is authorized anew, but never creates a mark or re-evaluates past policy.
+      if (receipt.estado !== 'pending') return receipt.resultado!;
+      const reject = async (code: 'ineligible' | 'day_changed' | 'initial_mark_exists') => {
+        const result = { code };
+        await tx
+          .update(recibosAsistencia)
+          .set({ estado: 'rejected', resultado: result })
+          .where(eq(recibosAsistencia.id, receiptId));
+        return result;
+      };
+      if (
+        !assignment ||
+        !operative ||
+        !observer ||
+        !module ||
+        operative.estado !== 'activo' ||
+        operative.toleranciaMinutos === null ||
+        !observer.activo ||
+        observer.usuarioId !== current.user.id ||
+        !module.activo ||
+        assignment.canceladaEn !== null ||
+        content.expectedDate < assignment.vigenteDesde ||
+        content.expectedDate > assignment.vigenteHasta ||
+        content.expectedDate < operative.fechaInicio ||
+        content.expectedDate > operative.fechaFin
+      )
+        return reject('ineligible');
+      const [accreditation] = await tx
+        .select({ id: auditoria.id })
+        .from(auditoria)
+        .where(
+          and(
+            eq(auditoria.tipoEntidad, 'observadores'),
+            eq(auditoria.entidadId, observer.id),
+            eq(auditoria.accion, 'observers.account.linked'),
+            sql`JSON_UNQUOTE(JSON_EXTRACT(${auditoria.valoresNuevos}, '$.userId')) = ${current.user.id}`,
+            sql`JSON_UNQUOTE(JSON_EXTRACT(${auditoria.valoresNuevos}, '$.verificationMethod')) = 'supervised_administrative'`,
+          ),
+        )
+        .limit(1)
+        .for('share');
+      if (!accreditation) return reject('ineligible');
+      const [existing] = await tx
+        .select({ id: registrosAsistencia.id })
+        .from(registrosAsistencia)
+        .where(
+          and(
+            eq(registrosAsistencia.asignacionId, assignment.id),
+            eq(registrosAsistencia.fechaAsistencia, content.expectedDate),
+            eq(registrosAsistencia.tipo, content.type),
+          ),
+        )
+        .limit(1)
+        .for('update');
+      if (existing) return reject('initial_mark_exists');
+      const flags = timingFlags(
+        receipt.recibidoEn,
+        content.expectedDate,
+        content.type,
+        assignment.horaInicio,
+        assignment.horaFin,
+        operative.toleranciaMinutos,
+      );
+      const location = content.location;
+      const missing = 'missingReason' in location;
+      const state =
+        flags.lateArrival || flags.earlyDeparture || missing
+          ? 'pending_review'
+          : 'accepted_automatic';
+      // Last check under all resource locks, immediately before mutation. This is not a commit-time guarantee.
+      if (
+        receipt.fechaLocal !== content.expectedDate ||
+        localDate(receivedAt(Date.now())) !== content.expectedDate
+      )
+        return reject('day_changed');
+      const [{ id }] = await tx
+        .insert(registrosAsistencia)
+        .values({
+          asignacionId: assignment.id,
+          fechaAsistencia: content.expectedDate,
+          tipo: content.type,
+          registradoEn: receipt.recibidoEn,
+          registradoPor: current.user.id,
+          canal: 'web',
+          reciboId: receipt.id,
+          latitud: missing ? null : location.latitude.toFixed(6),
+          longitud: missing ? null : location.longitude.toFixed(6),
+          precisionM: missing ? null : location.accuracy.toFixed(6),
+          motivoSinUbicacion: missing ? location.missingReason : null,
+          estado: state,
+          llegadaTardia: flags.lateArrival ? 1 : 0,
+          salidaTemprana: flags.earlyDeparture ? 1 : 0,
+          politicaVersion: policyVersion,
+        })
+        .$returningId();
+      await tx.insert(auditoria).values({
+        usuarioId: current.user.id,
+        sesionId: current.sessionId,
+        tipoEntidad: 'registros_asistencia',
+        entidadId: id,
+        accion: 'attendance.captured',
+        canal: 'web',
+        valoresNuevos: {
+          receiptId,
+          assignmentId: assignment.id,
+          date: content.expectedDate,
+          type: content.type,
+          state,
+          policyVersion,
+        },
+      });
+      const result: AttendanceResult = { attendanceId: id, state };
+      await tx
+        .update(recibosAsistencia)
+        .set({ estado: 'completed', resultado: result })
+        .where(eq(recibosAsistencia.id, receiptId));
+      return result;
+    });
+  }
+}
