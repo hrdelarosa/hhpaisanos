@@ -21,7 +21,7 @@ import { asignaciones } from './assignments.js';
 
 export type AttendanceResult =
   | { attendanceId: string; state: 'accepted_automatic' | 'pending_review' }
-  | { code: 'ineligible' | 'day_changed' | 'initial_mark_exists' };
+  | { code: 'ineligible' | 'day_changed' | 'initial_mark_exists' | 'invalid_order' };
 
 const exactKey = customType<{ data: string; driverData: string }>({
   dataType: () => 'varchar(128) COLLATE utf8mb4_0900_bin',
