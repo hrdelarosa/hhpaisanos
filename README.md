@@ -588,7 +588,7 @@ pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approv
 pnpm --filter @hhpaisanos/api users:provision-permissions <ADMIN-UUIDv7> "Approved initial access" --apply
 ```
 
-The closed mapping contains exactly twenty-six codes:
+The closed mapping contains exactly thirty-one codes:
 
 | Permission group    | Codes                                                                                                                                              | ADMIN     | ENLACE    | OBSERVADOR |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- | ---------- |
@@ -599,17 +599,21 @@ The closed mapping contains exactly twenty-six codes:
 | Assignments         | `assignments:read`, `assignments:create`, `assignments:update`, `assignments:cancel`                                                               | All four  | All four  | None       |
 | Personal Attendance | `attendance:read-own`, `attendance:capture-own`                                                                                                    | None      | None      | Both       |
 
-For databases provisioned with the previous twenty-four-code mapping, preview and explicitly
+Administrative Attendance adds `attendance:read`, `attendance:capture-manual`,
+`attendance:review`, `attendance:correct` and `attendance:annul` for ADMIN and ENLACE only.
+OBSERVADOR retains only its two personal Attendance grants.
+
+For databases provisioned with the previous twenty-six-code mapping, preview and explicitly
 apply the same command again after separate authorization. It preserves existing permission
-identifiers and approved grants, adding `attendance:read-own` and `attendance:capture-own`
-for OBSERVADOR only (four additions: two permission rows and two grants).
+identifiers and approved grants, adding the five administrative Attendance permissions
+and their ten ADMIN/ENLACE grants (exactly fifteen additions).
 Upgrading older mappings also reconciles the existing operational grants. This does
-not grant implicit ADMIN/ENLACE privileges. Final role totals are ADMIN 24, ENLACE 16,
-OBSERVADOR 2; Attendance administrative permissions remain deferred.
+not grant implicit ADMIN/ENLACE privileges. Final role totals are ADMIN 29, ENLACE 21,
+OBSERVADOR 2 (52 grants total); administrative roles never receive personal capture grants.
 
 Grants belong to roles, so all accounts with the role receive them. Applying the
 command creates missing permission rows, adds missing approved grants and removes
-incorrect grants **within these twenty-six codes and three roles only**. Other permissions,
+incorrect grants **within these thirty-one codes and three roles only**. Other permissions,
 other roles and existing descriptions are untouched. Actual changes have individual
 administrative audit events with the actor and supplied reason in one transaction;
 repeating an already-applied mapping writes nothing. The command never runs on
@@ -827,6 +831,75 @@ Stage 3 reuses migration 0003 without schema changes. Shared permission provisio
 a separate authorized operation; no provisioning or migration runs on startup. Tests in
 `attendance-http.integration.test.mjs` use disposable synthetic MySQL databases. No
 administrative Attendance endpoints, frontend, Telegram, offline or Stage 4 are enabled.
+
+### Administrative Attendance API (Stage 4)
+
+The approved organizational scope remains **Guerrero**. Active ADMIN and ENLACE accounts
+share this scope, but every operation still requires its explicit permission, revalidated
+transactionally. No role-name permission bypass exists. Office-level isolation is deferred
+until a proper organizational model is approved; no office identifiers or ownership tables
+are introduced. OBSERVADOR cannot use these routes even with accidental administrative grants.
+
+| Endpoint                               | Permission                  | Behavior                                                                                           |
+| -------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------- |
+| `GET /api/attendance`                  | `attendance:read`           | Current versions, validated filters and bounded pagination                                         |
+| `GET /api/attendance/:id`              | `attendance:read`           | Explicit detail of a selected version, including precise unverified location evidence              |
+| `GET /api/attendance/:id/history`      | `attendance:read`           | Paginated logical-mark versions and their administrative/capture audit events, without precise GPS |
+| `POST /api/attendance/manual`          | `attendance:capture-manual` | Explicitly accepted historical administrative mark; 201                                            |
+| `POST /api/attendance/:id/review`      | `attendance:review`         | Accept/reject only a pending current version; 200                                                  |
+| `POST /api/attendance/:id/corrections` | `attendance:correct`        | Create the next pending version; 201                                                               |
+| `POST /api/attendance/:id/annul`       | `attendance:annul`          | Annul the current non-annulled version, without deletion; 200                                      |
+
+All responses are `no-store`; writes require the existing CSRF headers. List filters:
+`operativeId`, `moduleId`, `observerId` (UUIDv7), inclusive civil dates `from`/`to`,
+`reviewStatus` (one approved status), and `anomaly` (`late_arrival`, `early_departure`,
+`missing_location`). `page` is 1–1,000,000 and `limit` 1–100 (default 20); history uses
+the same pagination bounds. Lists count current marks, not days. Factual anomalies remain
+visible after administrative acceptance; completeness counts present current marks and
+does not imply acceptance. Lists and history omit precise GPS and all receipt payloads.
+Only the explicitly permission-checked detail response returns coordinates and accuracy.
+
+Manual capture accepts `{ observerId, assignmentId, date, type, officialTimestamp,
+missingLocationReason, reason }`. `type` is `entrada`/`salida`; timestamps are explicit
+UTC strings with exactly six decimals, for example `2026-11-11T15:00:00.000000Z`.
+These are reported historical times, not measured request times. The observer must match
+the precise historical assignment; both assignment and operative must contain the civil
+date. The operative must be active or closed, with explicit tolerance; cancelled periods,
+draft operatives and future event times are rejected. Currently inactive profiles/modules
+do not erase historical applicability. No linked observer account is required for an
+administrative historical mark. The caller must explicitly declare one approved
+`missingLocationReason`; coordinates cannot be supplied or fabricated by this route.
+The mark is `accepted_administrative` with the acting administrator and mandatory reason,
+retaining calculated factual anomalies. Either half may be backfilled first; if a usable
+counterpart exists, exit must be strictly after entry. No other mark is fabricated.
+
+Review accepts `{ expectedVersion, decision: "accept" | "reject", reason }`; annul accepts
+`{ expectedVersion, reason }`. `expectedVersion` is the positive integer version of the
+selected record, not a new daily summary revision. Currentness/version and allowed state
+transitions are checked under assignment/mark locks; competing reviews or corrections
+cannot overwrite one another. Decisions update decision fields only, never event time,
+GPS, factual anomalies, capture actor, channel or receipt. Prior decisions remain in audit.
+Reasons must be nonblank and at most 500 Unicode code points.
+
+Correction accepts `{ expectedVersion, officialTimestamp, reason }`. It corrects the
+event time within the original civil date; assignment/date/type and original evidence
+cannot be replaced. The predecessor retains its complete record with `vigente = NULL`.
+The next version copies original actor/channel/manual provenance and exact location
+evidence, references its predecessor, and has no duplicate receipt FK. It recalculates
+timing flags under the stored `personal-v1` policy and immutable operative tolerance.
+Unknown historical policies are rejected rather than silently reinterpreted. Every new
+version is `pending_review`, with cleared decision fields, even when it has no anomalies.
+It requires a separate explicit `attendance:review` operation for acceptance; a correction
+permission alone does not confer review. Annulled marks cannot be corrected/recreated.
+Duplicate original manual or personal marks remain blocked across all historical versions.
+
+The existing receipt outcome remains immutable after administrative actions; replay is
+not a new mark or a fresh administrative decision. Transactions reuse Stage 2 error
+sanitization, assignment resource-lock order and audit insertion. No new schema migration
+is needed and migrations 0000–0003 are unchanged. Integration tests use disposable MySQL
+databases, including audit-trigger rollback and concurrent decisions. Shared provisioning
+remains a separately authorized operation; no migrations/provisioning are run by this
+feature. Frontend, Telegram, selfies, offline capture, absences and Stage 5 are not added.
 
 ## Git workflow
 

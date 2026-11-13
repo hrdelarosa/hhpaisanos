@@ -22,12 +22,24 @@ import {
 import { AuthService } from '../auth/auth.service.js';
 import type { AuthContext } from '../auth/auth.types.js';
 import { normalizeMark, type PersonalMark } from './attendance-input.js';
-import { instantMicros, localDate, receivedAt, timingFlags } from './attendance-time.js';
+import {
+  attendancePolicyVersion,
+  instantMicros,
+  localDate,
+  receivedAt,
+  timingFlags,
+} from './attendance-time.js';
 import { authorizePersonalAttendance, hasAdministrativeLink } from './attendance-access.js';
 
 type Transaction = Parameters<Parameters<DatabaseService['db']['transaction']>[0]>[0];
 const operation = 'attendance.capture-own';
-const policyVersion = 'personal-v1';
+const policyVersion = attendancePolicyVersion;
+export type AttendanceResources = {
+  operative?: typeof operativos.$inferSelect;
+  observer?: typeof observadores.$inferSelect;
+  module?: typeof modulosAtencion.$inferSelect;
+  assignment?: typeof asignaciones.$inferSelect;
+};
 
 /** Internal only: callers must pass the authenticated request boundary timestamp. */
 @Injectable()
@@ -37,7 +49,7 @@ export class AttendancePersistence {
     private readonly auth: AuthService,
   ) {}
 
-  private async transaction<T>(work: (tx: Transaction) => Promise<T>): Promise<T> {
+  async transaction<T>(work: (tx: Transaction) => Promise<T>): Promise<T> {
     try {
       return await this.database.db.transaction(work);
     } catch (error) {
@@ -49,10 +61,62 @@ export class AttendancePersistence {
         'code' in driver &&
         ['ER_LOCK_DEADLOCK', 'ER_LOCK_WAIT_TIMEOUT', 'ER_DUP_ENTRY'].includes(String(driver.code))
       )
-        throw new ConflictException('Concurrent attendance operation; retry with the same key');
+        throw new ConflictException(
+          'Concurrent attendance operation; reload and retry (personal capture uses the same key)',
+        );
       // Driver errors include SQL parameters, including GPS. Never expose or log them.
       throw new InternalServerErrorException('Attendance persistence failed');
     }
+  }
+
+  async lockAssignment(tx: Transaction, id: string): Promise<AttendanceResources> {
+    const [reference] = await tx.select().from(asignaciones).where(eq(asignaciones.id, id));
+    if (!reference) return {};
+    // Shared by personal capture and administrative mutations, matching scheduling.
+    const [operative] = await tx
+      .select()
+      .from(operativos)
+      .where(eq(operativos.id, reference.operativoId))
+      .for('share');
+    const [observer] = await tx
+      .select()
+      .from(observadores)
+      .where(eq(observadores.id, reference.observadorId))
+      .for('update');
+    const [module] = await tx
+      .select()
+      .from(modulosAtencion)
+      .where(eq(modulosAtencion.id, reference.moduloId))
+      .for('share');
+    const [assignment] = await tx
+      .select()
+      .from(asignaciones)
+      .where(eq(asignaciones.id, id))
+      .for('update');
+    return { operative, observer, module, assignment };
+  }
+
+  async writeAudit(
+    tx: Transaction,
+    context: AuthContext,
+    id: string,
+    action: string,
+    before: Record<string, unknown> | null,
+    after: Record<string, unknown>,
+    reason: string | null = null,
+  ) {
+    // Callers supply decision/provenance metadata only, never precise location or receipt payloads.
+    await tx.insert(auditoria).values({
+      usuarioId: context.user.id,
+      sesionId: context.sessionId,
+      tipoEntidad: 'registros_asistencia',
+      entidadId: id,
+      accion: action,
+      canal: 'web',
+      valoresAnteriores: before,
+      valoresNuevos: after,
+      motivo: reason,
+    });
   }
 
   private async authorize(tx: Transaction, context: AuthContext) {
@@ -140,32 +204,10 @@ export class AttendancePersistence {
 
       // Match scheduling: actor, operative SHARE, observer UPDATE, module SHARE,
       // assignment UPDATE, then receipt UPDATE. A pending receipt owns no assignment.
-      let operative: typeof operativos.$inferSelect | undefined;
-      let observer: typeof observadores.$inferSelect | undefined;
-      let module: typeof modulosAtencion.$inferSelect | undefined;
-      let assignment: typeof asignaciones.$inferSelect | undefined;
-      if (assignmentReference) {
-        [operative] = await tx
-          .select()
-          .from(operativos)
-          .where(eq(operativos.id, assignmentReference.operativoId))
-          .for('share');
-        [observer] = await tx
-          .select()
-          .from(observadores)
-          .where(eq(observadores.id, assignmentReference.observadorId))
-          .for('update');
-        [module] = await tx
-          .select()
-          .from(modulosAtencion)
-          .where(eq(modulosAtencion.id, assignmentReference.moduloId))
-          .for('share');
-        [assignment] = await tx
-          .select()
-          .from(asignaciones)
-          .where(eq(asignaciones.id, content.assignmentId))
-          .for('update');
-      }
+      const resources: AttendanceResources = assignmentReference
+        ? await this.lockAssignment(tx, assignmentReference.id)
+        : {};
+      const { operative, observer, module, assignment } = resources;
       const [receipt] = await tx
         .select()
         .from(recibosAsistencia)
@@ -286,21 +328,13 @@ export class AttendancePersistence {
           politicaVersion: policyVersion,
         })
         .$returningId();
-      await tx.insert(auditoria).values({
-        usuarioId: current.user.id,
-        sesionId: current.sessionId,
-        tipoEntidad: 'registros_asistencia',
-        entidadId: id,
-        accion: 'attendance.captured',
-        canal: 'web',
-        valoresNuevos: {
-          receiptId,
-          assignmentId: assignment.id,
-          date: content.expectedDate,
-          type: content.type,
-          state,
-          policyVersion,
-        },
+      await this.writeAudit(tx, current, id, 'attendance.captured', null, {
+        receiptId,
+        assignmentId: assignment.id,
+        date: content.expectedDate,
+        type: content.type,
+        state,
+        policyVersion,
       });
       const result: AttendanceResult = { attendanceId: id, state };
       await tx

@@ -13,6 +13,13 @@ import {
 } from '../dist/database/schema/index.js';
 
 const ownAttendancePermissions = ['attendance:read-own', 'attendance:capture-own'];
+const administrativeAttendancePermissions = [
+  'attendance:read',
+  'attendance:capture-manual',
+  'attendance:review',
+  'attendance:correct',
+  'attendance:annul',
+];
 
 // Deliberately closed catalog: this command cannot provision arbitrary privileges.
 export const approvedPermissions = [
@@ -40,6 +47,7 @@ export const approvedPermissions = [
   'assignments:create',
   'assignments:update',
   'assignments:cancel',
+  ...administrativeAttendancePermissions,
   ...ownAttendancePermissions,
 ];
 const mappings = {
@@ -61,6 +69,7 @@ const mappings = {
     'assignments:create',
     'assignments:update',
     'assignments:cancel',
+    ...administrativeAttendancePermissions,
   ],
   OBSERVADOR: ownAttendancePermissions,
 };
