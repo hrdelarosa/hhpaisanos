@@ -38,6 +38,11 @@ const operationalPermissions = [
   'assignments:create',
   'assignments:update',
   'assignments:cancel',
+  'attendance:read',
+  'attendance:capture-manual',
+  'attendance:review',
+  'attendance:correct',
+  'attendance:annul',
 ];
 const ownAttendancePermissions = ['attendance:read-own', 'attendance:capture-own'];
 let app, db, baseUrl, dbUser, admin, adminCookie, config, originalDatabase, originalOrigins;
@@ -172,7 +177,7 @@ it('provisions only the approved mappings explicitly, atomically and idempotentl
     ...operationalPermissions,
     ...ownAttendancePermissions,
   ]);
-  expect(preview).toHaveLength(68); // 26 rows, 24 ADMIN + 16 ENLACE + 2 OBSERVADOR grants.
+  expect(preview).toHaveLength(83); // 31 rows, 29 ADMIN + 21 ENLACE + 2 OBSERVADOR grants.
   expect(await db.select().from(t.permisos)).toEqual([]);
   expect(await db.select().from(t.rolPermisos)).toEqual([]);
   expect(await db.select().from(t.auditoria)).toEqual([]);
@@ -220,7 +225,7 @@ it('provisions only the approved mappings explicitly, atomically and idempotentl
   const before = await db.select().from(t.auditoria);
   expect(await provisionUsersPermissions(db, admin.id, 'Repeat', true)).toEqual([]);
   expect(await db.select().from(t.auditoria)).toEqual(before);
-  expect(before.filter((e) => e.accion.startsWith('access.'))).toHaveLength(69);
+  expect(before.filter((e) => e.accion.startsWith('access.'))).toHaveLength(84);
   expect(
     before
       .filter((e) => e.accion.startsWith('access.'))
@@ -251,7 +256,7 @@ it('upgrades the previous ten-code mapping without changing existing grants or a
   const observersBefore = await db.select().from(t.observadores);
   const auditBefore = await db.select().from(t.auditoria);
   const preview = await provisionUsersPermissions(db, admin.id, 'Upgrade preview');
-  expect(preview).toHaveLength(47); // Administrative upgrade plus two own-only rows and grants.
+  expect(preview).toHaveLength(62); // Previous upgrade plus five administrative rows and ten grants.
   expect(preview.every((change) => change.action !== 'grant.remove')).toBe(true);
   expect(await db.select().from(t.permisos)).toEqual(existingPermissions);
   expect(await db.select().from(t.rolPermisos)).toEqual(existingGrants);
@@ -263,8 +268,8 @@ it('upgrades the previous ten-code mapping without changing existing grants or a
   expect(await db.select().from(t.sesiones)).toEqual(sessionsBefore);
   expect(await db.select().from(t.observadores)).toEqual(observersBefore);
   const auditAfter = await db.select().from(t.auditoria);
-  expect(auditAfter).toHaveLength(auditBefore.length + 47);
-  expect(auditAfter.filter((event) => event.motivo === 'Approved upgrade')).toHaveLength(47);
+  expect(auditAfter).toHaveLength(auditBefore.length + 62);
+  expect(auditAfter.filter((event) => event.motivo === 'Approved upgrade')).toHaveLength(62);
   expect(await provisionUsersPermissions(db, admin.id, 'Repeat upgrade', true)).toEqual([]);
   expect(await db.select().from(t.auditoria)).toEqual(auditAfter);
 });
@@ -431,6 +436,56 @@ it('adds personal Attendance permissions only to OBSERVADOR and removes accident
   const finalAudit = await db.select().from(t.auditoria);
   expect(await provisionUsersPermissions(db, admin.id, 'Repeat own upgrade', true)).toEqual([]);
   expect(await db.select().from(t.auditoria)).toEqual(finalAudit);
+});
+
+it('upgrades Stage 3 with exactly five administrative Attendance rows and ten administrative grants', async () => {
+  const codes = operationalPermissions.filter((code) => code.startsWith('attendance:'));
+  const added = await db.select().from(t.permisos).where(inArray(t.permisos.codigo, codes));
+  await db.delete(t.rolPermisos).where(
+    inArray(
+      t.rolPermisos.permisoId,
+      added.map((row) => row.id),
+    ),
+  );
+  await db.delete(t.permisos).where(
+    inArray(
+      t.permisos.id,
+      added.map((row) => row.id),
+    ),
+  );
+  const before = {
+    permissions: await db.select().from(t.permisos),
+    grants: await db.select().from(t.rolPermisos),
+    audit: await db.select().from(t.auditoria),
+    users: await db.select().from(t.usuarios),
+    sessions: await db.select().from(t.sesiones),
+  };
+  const expected = codes.flatMap((permission) => [
+    { action: 'permission.create', permission },
+    { action: 'grant.add', role: 'ADMIN', permission },
+    { action: 'grant.add', role: 'ENLACE', permission },
+  ]);
+  expect(await provisionUsersPermissions(db, admin.id, 'Stage 4 preview')).toEqual(expected);
+  expect(await db.select().from(t.permisos)).toEqual(before.permissions);
+  expect(await db.select().from(t.rolPermisos)).toEqual(before.grants);
+  expect(await db.select().from(t.auditoria)).toEqual(before.audit);
+  expect(await provisionUsersPermissions(db, admin.id, 'Stage 4 upgrade', true)).toEqual(expected);
+  expect(await db.select().from(t.permisos)).toEqual(expect.arrayContaining(before.permissions));
+  expect(await db.select().from(t.rolPermisos)).toEqual(expect.arrayContaining(before.grants));
+  expect(await db.select().from(t.usuarios)).toEqual(before.users);
+  expect(await db.select().from(t.sesiones)).toEqual(before.sessions);
+  expect(await db.select().from(t.auditoria)).toHaveLength(before.audit.length + 15);
+  const rows = await db
+    .select({ role: t.roles.codigo, code: t.permisos.codigo })
+    .from(t.rolPermisos)
+    .innerJoin(t.roles, eq(t.roles.id, t.rolPermisos.rolId))
+    .innerJoin(t.permisos, eq(t.permisos.id, t.rolPermisos.permisoId));
+  expect(rows.filter((row) => row.role === 'OBSERVADOR' && codes.includes(row.code))).toEqual([]);
+  for (const role of ['ADMIN', 'ENLACE'])
+    expect(
+      rows.filter((row) => row.role === role && ownAttendancePermissions.includes(row.code)),
+    ).toEqual([]);
+  expect(await provisionUsersPermissions(db, admin.id, 'Repeat Stage 4 upgrade', true)).toEqual([]);
 });
 
 it('requires ADMIN and each explicit permission, rejects temporary credentials and CSRF', async () => {

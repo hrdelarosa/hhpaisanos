@@ -1,4 +1,5 @@
 const zone = 'America/Mexico_City';
+export const attendancePolicyVersion = 'personal-v1';
 const civil = new Intl.DateTimeFormat('en-CA', {
   timeZone: zone,
   year: 'numeric',

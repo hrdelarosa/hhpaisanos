@@ -21,6 +21,29 @@ export async function authorizePersonalAttendance(
   return current;
 }
 
+export type AdministrativeAttendancePermission =
+  | 'attendance:read'
+  | 'attendance:capture-manual'
+  | 'attendance:review'
+  | 'attendance:correct'
+  | 'attendance:annul';
+
+export async function authorizeAdministrativeAttendance(
+  tx: AttendanceTransaction,
+  auth: AuthService,
+  context: AuthContext,
+  permission: AdministrativeAttendancePermission,
+) {
+  const current = await auth.requireCurrentContext(tx, context);
+  // The approved organizational scope is Guerrero, not an implicit national/office scope.
+  if (
+    !['ADMIN', 'ENLACE'].includes(current.user.role) ||
+    !current.user.permissions.includes(permission)
+  )
+    throw new ForbiddenException('Insufficient permissions');
+  return current;
+}
+
 export async function hasAdministrativeLink(
   tx: AttendanceTransaction,
   observerId: string,

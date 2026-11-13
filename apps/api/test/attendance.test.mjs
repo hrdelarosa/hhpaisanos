@@ -108,7 +108,7 @@ it('maps rolled-back deadlocks to retryable conflicts without exposing SQL or GP
     {},
   );
   await expect(persistence.complete({}, v7())).rejects.toThrow(
-    'Concurrent attendance operation; retry with the same key',
+    'Concurrent attendance operation; reload and retry (personal capture uses the same key)',
   );
 });
 
