@@ -59,6 +59,10 @@ apps/api/src/modules/auth/ Authentication, server-side sessions and permission g
 apps/api/src/modules/users/ Account administration and read-only access catalogs
 apps/api/src/modules/observers/ Observer profile administration independent of accounts
 apps/web/src/         Single React application
+apps/web/src/app/     Composition, providers, routing and base layout
+apps/web/src/modules/ Module-specific API integrations and pages (health only in F1A)
+apps/web/src/lib/     Same-origin JSON HTTP transport and shadcn class utility
+apps/web/src/styles/  Semantic Tailwind/shadcn tokens from root DESIGN.md
 docs/                Functional requirements and proposed database model
 ```
 
@@ -79,6 +83,26 @@ Vite+ runs all tests. API HTTP tests import Nest's compiled output to preserve
 TypeScript decorator metadata without adding another transpiler. Web tests run
 with jsdom and React Testing Library. Task caching is explicitly disabled; no
 build cache optimization has been adopted.
+
+The web foundation uses React Router 8 with `nuqs/adapters/react-router/v8`,
+TanStack Query for server state (30-second freshness, no automatic retries), and
+React Hook Form + Zod/resolvers for upcoming forms. There is no authentication
+flow, persisted query cache, or global UI store yet. Module directories are added
+only when implemented; shared component and hook directories are not placeholders.
+
+The HTTP client accepts only same-origin `/api/` paths, returns `unknown` for
+module-level contract validation, supports abort signals and `204`, and sends
+JSON plus `X-HHP-CSRF: 1` for mutations. Network/abort errors remain distinct from
+`HttpError` status/code responses; raw error bodies are not retained. Neither the
+client nor Query automatically retries writes. Server-managed HttpOnly cookies
+remain the authentication mechanism; F1B will implement the session lifecycle.
+
+Tailwind v4 and `apps/web/components.json` provide minimal shadcn configuration.
+No component library or new UI primitives are generated until needed. Visual
+tokens follow `DESIGN.md`, including explicit `.dark` overrides (no theme toggle).
+Inter uses a system fallback until approved self-hosted font assets are available;
+there are no runtime font CDN requests. Browser E2E setup is a separate task before
+F1B browser validation, not part of this foundation.
 
 ## Local MySQL and environment
 

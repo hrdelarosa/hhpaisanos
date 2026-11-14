@@ -1,0 +1,152 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/* DESIGN.md is the single source for this semantic light/dark palette. */
+:root {
+  color-scheme: light;
+  --background: #f7f6f2;
+  --foreground: #202924;
+  --foreground-secondary: #52615a;
+  --muted-foreground: #626f68;
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --muted: #f0f3ef;
+  --primary: #235b4e;
+  --primary-foreground: #ffffff;
+  --primary-hover: #183f36;
+  --secondary: #e7f1ec;
+  --secondary-foreground: #183f36;
+  --secondary-hover: #d8e9e1;
+  /* shadcn accent is interactive selection, not DESIGN.md's decorative gold. */
+  --accent: var(--secondary);
+  --accent-foreground: var(--secondary-foreground);
+  --decoration: #a48642;
+  --decoration-soft: #f6eedc;
+  --border: #dde3dc;
+  --input: #6e7b74;
+  --ring: #183f36;
+  --focus-inverse: #f6eedc;
+  --success: #23744b;
+  --success-surface: #e8f5ec;
+  --warning: #946000;
+  --warning-surface: #fff2d6;
+  --destructive: #b42332;
+  --destructive-foreground: #ffffff;
+  --danger-surface: #fceaed;
+  --info: #245d8c;
+  --info-surface: #eaf3fa;
+  --radius: 8px;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #101916;
+  --foreground: #eef3f0;
+  --foreground-secondary: #b3c0ba;
+  --muted-foreground: #a7b5ae;
+  --card: #17231f;
+  --muted: #1e2b26;
+  --primary: #2e7d69;
+  --primary-hover: #33826e;
+  --secondary: #1e3a31;
+  --secondary-foreground: #eef3f0;
+  --secondary-hover: #1e2b26;
+  --decoration: #c9a55c;
+  --decoration-soft: #2c2312;
+  --border: #2c3a34;
+  --input: #7b8a83;
+  --ring: #e7f1ec;
+  --success: #5fcf95;
+  --success-surface: #12291e;
+  --warning: #e7b45a;
+  --warning-surface: #2c2312;
+  --destructive: #f38b96;
+  --destructive-foreground: #101916;
+  --danger-surface: #2e1419;
+  --info: #7fbdeb;
+  --info-surface: #11212f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-decoration: var(--decoration);
+  --color-decoration-soft: var(--decoration-soft);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-focus-inverse: var(--focus-inverse);
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-danger-surface: var(--danger-surface);
+  --color-info: var(--info);
+  --color-info-surface: var(--info-surface);
+  --radius-sm: calc(var(--radius) / 2);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 1.5);
+  --font-sans: Inter, ui-sans-serif, system-ui, Arial, sans-serif;
+  --spacing: 4px;
+  --spacing-touch: 44px;
+  --container-page: 1440px;
+  --container-form: 720px;
+  --spacing-sidebar: 248px;
+  --text-caption: 12px;
+  --text-caption--line-height: 1.4;
+  --text-body-sm: 14px;
+  --text-body-sm--line-height: 1.5;
+  --text-body: 16px;
+  --text-body--line-height: 1.5;
+  --text-label: 14px;
+  --text-label--line-height: 1.4;
+  --text-label--font-weight: 500;
+  --text-subheading: 18px;
+  --text-subheading--line-height: 1.4;
+  --text-subheading--font-weight: 500;
+  --text-heading-sm: 20px;
+  --text-heading-sm--line-height: 1.3;
+  --text-heading-sm--font-weight: 600;
+  --text-heading: 24px;
+  --text-heading--line-height: 1.25;
+  --text-heading--font-weight: 600;
+  --text-heading-lg: 30px;
+  --text-heading-lg--line-height: 1.2;
+  --text-heading-lg--font-weight: 600;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background font-sans text-body text-foreground;
+    margin: 0;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
