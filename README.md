@@ -23,7 +23,7 @@ pnpm dev
 - API health: <http://localhost:3000/api/health>
 
 Both servers bind to loopback only. The web development server proxies `/api`
-to Nest. The page displays loading, success, or failure based on the real health
+to Nest. `/estado` displays loading, success, or failure based on the real health
 response. Restart/reload the page to check again after restarting the API.
 Stop both development processes with Ctrl+C.
 
@@ -86,8 +86,8 @@ build cache optimization has been adopted.
 
 The web foundation uses React Router 8 with `nuqs/adapters/react-router/v8`,
 TanStack Query for server state (30-second freshness, no automatic retries), and
-React Hook Form + Zod/resolvers for upcoming forms. There is no authentication
-flow, persisted query cache, or global UI store yet. Module directories are added
+React Hook Form + Zod/resolvers for authentication forms. There is no persisted
+query cache or global UI store. Module directories are added
 only when implemented; shared component and hook directories are not placeholders.
 
 The HTTP client accepts only same-origin `/api/` paths, returns `unknown` for
@@ -95,13 +95,49 @@ module-level contract validation, supports abort signals and `204`, and sends
 JSON plus `X-HHP-CSRF: 1` for mutations. Network/abort errors remain distinct from
 `HttpError` status/code responses; raw error bodies are not retained. Neither the
 client nor Query automatically retries writes. Server-managed HttpOnly cookies
-remain the authentication mechanism; F1B will implement the session lifecycle.
+remain the authentication mechanism.
 
 Tailwind v4 and `apps/web/components.json` provide minimal shadcn configuration.
 No component library or new UI primitives are generated until needed. Visual
 tokens follow `DESIGN.md`, including explicit `.dark` overrides (no theme toggle).
 Inter uses a system fallback until approved self-hosted font assets are available;
 there are no runtime font CDN requests.
+
+### Web authentication (F1B)
+
+- `/login`: uncontrolled React Hook Form inputs with Zod validation. Passwords
+  exist only in the input/form submission lifecycle and are cleared after sending;
+  they are never copied to application state, Query mutation variables or logs.
+- `/`: authenticated session home. Future operational sections are listed only
+  for effective role/permission combinations and explicitly marked unavailable;
+  there are no Attendance or administration screens yet.
+- `/cambiar-contrasena`: mandatory or voluntary change. Mandatory-change sessions
+  can only use this screen and logout. A confirmed change revokes all sessions
+  and requires a new login; a `401` from this endpoint triggers `/auth/me`
+  revalidation because it can also mean an incorrect current password.
+- On reload, `/api/auth/me` restores only the public user projection in Query.
+  Protected content is hidden while validation is pending or fails, including
+  focus/reconnect revalidation. Network/invalid-response errors offer an explicit
+  retry rather than assuming an anonymous session or exposing stale data.
+- Authenticated `401` responses discard the session-dependent Query client;
+  ordinary `403` responses do not log out. `PASSWORD_CHANGE_REQUIRED` discards
+  private data and rereads the server projection. There are no tokens, session
+  identifiers, JWTs, refresh logic or browser storage persistence in the web app.
+- Logout hides private content and discards its client immediately. If the server
+  response is uncertain, only retrying logout is offered; the app never claims
+  the cookie/session was revoked. An uncertain login can be reconciled using
+  **Verificar sesión existente**, without automatically resending credentials.
+- Each identity/permission transition installs a fresh Query client and remounts
+  the dependent subtree. Queries are cancelled and old caches cleared, so late
+  callbacks can only write to a discarded client. Future private server-state
+  calls must use this provided Query client and pass query abort signals to HTTP;
+  only genuinely public operations should set `meta: { public: true }`.
+
+All mutating auth calls reuse the same-origin JSON/CSRF transport. Auth actions
+are single-flight and deliberately bypass MutationCache to avoid credential
+retention. Route visibility is not authorization: API guards remain authoritative.
+There is no client expiry clock; revocation is detected by server responses and
+focus/reconnect checks, not by an invented renewal mechanism.
 
 ### Browser checks with Playwright CLI (P0)
 

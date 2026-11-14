@@ -1,6 +1,17 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vite-plus/test';
 import { App } from './app/App';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { createQueryClient } from './lib/query-client';
+import { HealthPage } from './modules/health/pages/HealthPage';
+
+function renderHealth() {
+  return render(
+    <QueryClientProvider client={createQueryClient()}>
+      <HealthPage />
+    </QueryClientProvider>,
+  );
+}
 
 afterEach(() => {
   cleanup();
@@ -11,7 +22,7 @@ afterEach(() => {
 it('shows loading and then the API connection status', async () => {
   const fetchMock = vi.fn().mockResolvedValue(Response.json({ status: 'ok' }));
   vi.stubGlobal('fetch', fetchMock);
-  render(<App />);
+  renderHealth();
   expect(screen.getByRole('status').textContent).toContain('Verificando');
   await screen.findByText('API conectada.');
   expect(fetchMock).toHaveBeenCalledWith(
@@ -26,17 +37,17 @@ it.each([
   ['invalid response', () => Promise.resolve(Response.json({ status: 'unexpected' }))],
 ])('shows an error on %s', async (_name, response) => {
   vi.stubGlobal('fetch', vi.fn(response));
-  render(<App />);
+  renderHealth();
   await screen.findByText('No se pudo conectar con la API.');
   expect(fetch).toHaveBeenCalledTimes(1);
 });
 
-it('renders an unknown route without making API requests', () => {
-  const fetchMock = vi.fn();
+it('renders an unknown route without fetching private resources', () => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
   vi.stubGlobal('fetch', fetchMock);
   window.history.replaceState(null, '', '/no-existe');
   render(<App />);
   expect(screen.getByRole('heading', { name: 'Página no encontrada' })).toBeTruthy();
   expect(screen.getByRole('link', { name: 'Volver al inicio' }).getAttribute('href')).toBe('/');
-  expect(fetchMock).not.toHaveBeenCalled();
+  expect(fetchMock.mock.calls.every(([path]) => path === '/api/auth/me')).toBe(true);
 });
