@@ -12,3 +12,5 @@ coverage/
 .opencode/skills/
 .agents/skills/
 .claude/skills/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
