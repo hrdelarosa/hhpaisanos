@@ -4,6 +4,7 @@ import { getHealth } from '../api/health';
 export function HealthPage() {
   const health = useQuery({
     queryKey: ['health'],
+    meta: { public: true },
     queryFn: ({ signal }) => getHealth(signal),
   });
 
