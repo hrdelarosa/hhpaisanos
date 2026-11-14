@@ -101,8 +101,71 @@ Tailwind v4 and `apps/web/components.json` provide minimal shadcn configuration.
 No component library or new UI primitives are generated until needed. Visual
 tokens follow `DESIGN.md`, including explicit `.dark` overrides (no theme toggle).
 Inter uses a system fallback until approved self-hosted font assets are available;
-there are no runtime font CDN requests. Browser E2E setup is a separate task before
-F1B browser validation, not part of this foundation.
+there are no runtime font CDN requests.
+
+### Browser checks with Playwright CLI (P0)
+
+The official [`@playwright/cli`](https://github.com/microsoft/playwright-cli) is
+pinned in root devDependencies and the PNPM lockfile. It is not the Playwright
+Test runner; no `@playwright/test` dependency or parallel test suite is added.
+CLI 0.1.24 ships with Playwright `1.66.0-alpha-1794252756000`; the upstream
+prerelease dependency is locked rather than replaced or upgraded independently.
+Use the project commands rather than an independently installed global CLI:
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm e2e:setup
+node ./node_modules/@playwright/cli/playwright-cli.js --version
+node ./node_modules/@playwright/cli/playwright-cli.js --help
+```
+
+`e2e:setup` runs the official `playwright-cli install --skills=agents`. It installs
+the package's bundled skill and reference files in `.agents/skills/playwright-cli/`,
+which OpenCode discovers as a project skill. These generated files remain ignored
+by the existing local-skill policy; rerun setup for every new clone/worktree.
+The skill has no independent version: it comes from the pinned CLI's Playwright
+dependency. Do not edit the generated instructions. Setup may download FFmpeg;
+it detects installed browsers. The checked-in `.playwright/cli.config.json` uses
+installed Google Chrome in headless, isolated mode, without a persistent profile.
+Node 24 and Windows PowerShell are supported. If Chrome is unavailable, use the
+official CLI `install-browser chrome` command only when its installation
+is authorized; do not download all Playwright browsers by default.
+
+Start only the frontend in another terminal for a no-credentials smoke check:
+
+```powershell
+pnpm --filter @hhpaisanos/web dev
+```
+
+Run these from the repository root so the shared configuration is loaded:
+
+```powershell
+$cli = './node_modules/@playwright/cli/playwright-cli.js'
+node $cli -s=hhp-smoke open http://localhost:5173
+node $cli -s=hhp-smoke snapshot
+node $cli -s=hhp-smoke close
+```
+
+Invoke the installed package's entrypoint directly for browser sessions. With
+PNPM 12 on Windows, `pnpm exec`/`pnpm run` can terminate the background browser
+when each command exits. Direct Node invocation preserves it across commands;
+there is no custom browser wrapper or global CLI requirement.
+
+The foundation renders even when `/api/health` is unavailable; this is not proof
+of API connectivity. Authenticated E2E requires F1B plus an explicitly authorized
+isolated API/database environment and synthetic accounts with the relevant roles,
+permissions and relationships. Do not create users in the shared development DB.
+Use HTTPS and same-origin `/api` outside localhost. Run only feature-relevant
+browser checks; Vitest through Vite+ remains the unit/component test workflow.
+
+Session profiles remain in memory. Close only your named session when finished;
+do not attach to personal browsers, use `--persistent`, export cookies/storage,
+or run `state-save` with credentials. Snapshots, console/network logs, traces and
+screenshots may contain sensitive data. Default artifacts go to ignored
+`.playwright-cli/`; do not commit/upload them or use output paths elsewhere in
+the repository. Avoid recording credentials, precise GPS and authentication
+traffic; use only authorized synthetic data. An ignored directory is not a
+security boundary or a substitute for careful artifact review.
 
 ## Local MySQL and environment
 
