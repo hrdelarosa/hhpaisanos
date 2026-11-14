@@ -35,6 +35,19 @@ Do not invent or silently change functional requirements. Report material incons
 - Do not access MySQL directly from the web application.
 - Introduce shared workspace packages only when actual reuse justifies them.
 
+## Frontend Design
+
+- Read the root `DESIGN.md` before creating or modifying frontend UI, styles, layouts, or components.
+- Treat `DESIGN.md` as the authoritative source for visual identity, design tokens, typography, spacing, responsive layouts, component styling, and accessibility.
+- Follow the existing React, TailwindCSS, and shadcn/ui conventions. Reuse established design tokens and UI components before introducing new ones.
+- Organize frontend functionality under `apps/web/src/modules/`, grouping module-specific components, hooks, API integrations, schemas, types, and utilities by responsibility.
+- Keep shared UI components outside business modules only when genuine reuse is justified.
+- Use semantic design tokens instead of hardcoded colors, spacing, or other visual values.
+- Maintain consistent visual behavior across OBSERVADOR, ENLACE, and ADMIN interfaces, adapting layouts to their workflows and screen sizes.
+- Keep user-facing interface text in Spanish.
+- Do not invent official logos, branding requirements, or visual assets.
+- Keep functional requirements, business rules, API contracts, and authorization separate from visual design decisions.
+
 ## Development
 
 - Follow the confirmed functional requirements.
