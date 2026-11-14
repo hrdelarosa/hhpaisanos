@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { useSession } from '../hooks/use-session';
 
 const sections = [
@@ -30,13 +31,22 @@ export function SessionHomePage() {
       <nav aria-label="Secciones autorizadas" className="space-y-4">
         <h2 className="text-heading-sm">Accesos según tus permisos</h2>
         <p className="text-foreground-secondary">
-          Estas secciones se habilitarán en las siguientes etapas. Aún no están disponibles.
+          Las secciones marcadas como próximas aún no están disponibles.
         </p>
         {available.length ? (
           <ul className="space-y-2">
             {available.map((item) => (
               <li key={item.permission}>
-                <span aria-disabled="true">{item.label} · Próximamente</span>
+                {item.permission === 'attendance:read-own' ? (
+                  <Link
+                    className="inline-flex min-h-touch items-center text-primary underline"
+                    to="/mi-asistencia"
+                  >
+                    {item.label}
+                  </Link>
+                ) : (
+                  <span aria-disabled="true">{item.label} · Próximamente</span>
+                )}
               </li>
             ))}
           </ul>

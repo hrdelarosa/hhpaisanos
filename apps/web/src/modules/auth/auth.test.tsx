@@ -227,9 +227,9 @@ it('hides private content immediately during logout and supports retry on uncert
 });
 
 it.each([
-  [observer, 'Asistencia personal · Próximamente', 'Cuentas · Próximamente'],
+  [observer, 'Asistencia personal', 'Cuentas · Próximamente'],
   [{ ...admin, role: 'ENLACE' }, 'Observadores · Próximamente', 'Cuentas · Próximamente'],
-  [admin, 'Cuentas · Próximamente', 'Asistencia personal · Próximamente'],
+  [admin, 'Cuentas · Próximamente', 'Asistencia personal'],
 ])(
   'renders only effective role/permission capabilities for $role',
   async (user, present, absent) => {

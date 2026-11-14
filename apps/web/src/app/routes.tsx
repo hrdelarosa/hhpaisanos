@@ -6,6 +6,9 @@ import { RequireSession } from '../modules/auth/components/RequireSession';
 import { LoginPage } from '../modules/auth/pages/LoginPage';
 import { ChangePasswordPage } from '../modules/auth/pages/ChangePasswordPage';
 import { SessionHomePage } from '../modules/auth/pages/SessionHomePage';
+import { AttendanceLayout } from '../modules/attendance/components/AttendanceLayout';
+import { TodayAttendancePage } from '../modules/attendance/pages/TodayAttendancePage';
+import { AttendanceHistoryPage } from '../modules/attendance/pages/AttendanceHistoryPage';
 
 export const routes: RouteObject[] = [
   {
@@ -18,7 +21,17 @@ export const routes: RouteObject[] = [
         children: [
           {
             element: <AuthenticatedLayout />,
-            children: [{ index: true, element: <SessionHomePage /> }],
+            children: [
+              { index: true, element: <SessionHomePage /> },
+              {
+                path: 'mi-asistencia',
+                element: <AttendanceLayout />,
+                children: [
+                  { index: true, element: <TodayAttendancePage /> },
+                  { path: 'historial', element: <AttendanceHistoryPage /> },
+                ],
+              },
+            ],
           },
         ],
       },
