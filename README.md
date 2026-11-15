@@ -239,6 +239,46 @@ F4A adds no backend changes, migrations, editing, closure, reopening, Attention
 Modules, Observers, Assignments or administrative Attendance screens. Existing
 schema migrations and centrally provisioned permissions remain deployment prerequisites.
 
+### Administrative Attention Modules management (F4B)
+
+- `/modulos` lists server-provided names, municipalities and active flags across
+  Guerrero. nuqs stores only supported filters (`name`, exact `municipality`,
+  `active`, `page`, `limit`) in the URL and preserves them on detail/return links.
+  Ordering remains creation time and ID descending, as supplied by the API.
+- `/modulos/nuevo` creates an active module using only trimmed `name` (120 Unicode
+  code points) and `municipality` (100). React Hook Form and Zod validate inputs;
+  create-only sessions confirm in place without opening an unauthorized detail.
+- `/modulos/:id` shows the server-controlled status, UUID and full-precision UTC
+  metadata. Editing sends only changed name/municipality fields and a required
+  nonblank `reason` (maximum 500 code points). Any existing assignment, including
+  cancelled assignments, blocks effective edits with 409. The read projection
+  has no assignment indicator; the UI does not invent one or fetch assignment data.
+- Activation/deactivation uses `PATCH /api/attention-modules/:id/status` with an
+  explicit boolean `active` and `reason`. Separate confirmation explains that
+  assignments and history remain unchanged, and deactivation affects eligibility
+  for new assignments and personal capture. Existing assignments do not block
+  status changes in this API.
+- Each operation requires its exact session permission (`read`, `create`, `update`,
+  `change-status` under `attention-modules:`); ADMIN has no bypass. Writes reuse
+  HttpOnly cookies and the existing CSRF transport, never update status optimistically
+  and never retry automatically. Confirmed writes invalidate module queries.
+- Editing rereads the original snapshot before submission; status changes reread
+  before confirmation and again before submission. Changed snapshots require review
+  rather than a silent overwrite. These are best-effort checks: the existing API
+  accepts no version precondition, so a race between the last GET and PATCH cannot
+  be eliminated by the frontend. The backend remains authoritative. Uncertain
+  outcomes explicitly request a current-state check before any deliberate resubmission.
+- Focused Vitest/RTL tests cover filters, creation/editing, Unicode validation,
+  permissions, status confirmations, assignment conflicts, concurrent changes,
+  invalidation, loading, empty and failure states. Playwright CLI checks used real
+  Nest APIs and a disposable synthetic MySQL database/account, exercising both
+  existing/cancelled assignment conflicts, allowed status changes with assignments,
+  read-only permissions, concurrency, filters, pagination and 390px layouts.
+
+No backend changes, migrations, Observer/Assignment management or administrative
+Attendance screens are added. F4C still needs its separately approved scope;
+existing migrations and explicit centralized permission provisioning remain prerequisites.
+
 ### Browser checks with Playwright CLI (P0)
 
 The official [`@playwright/cli`](https://github.com/microsoft/playwright-cli) is
