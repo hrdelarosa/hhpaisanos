@@ -83,6 +83,14 @@ export function OperativeDetailPage() {
           </dd>
         </div>
       </dl>
+      {user?.permissions.includes('assignments:read') && (
+        <Link
+          className="inline-flex min-h-touch items-center text-primary underline"
+          to={`/asignaciones?operativeId=${operative.id}`}
+        >
+          Consultar asignaciones del operativo
+        </Link>
+      )}
       {user?.permissions.includes('operatives:activate') && (
         <ActivateOperative key={operative.id} operative={operative} />
       )}

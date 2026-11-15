@@ -76,6 +76,14 @@ export function ObserverDetailPage() {
           </dd>
         </div>
       </dl>
+      {user?.permissions.includes('assignments:read') && (
+        <Link
+          className="inline-flex min-h-touch items-center text-primary underline"
+          to={`/asignaciones?observerId=${observer.id}`}
+        >
+          Consultar asignaciones del observador
+        </Link>
+      )}
       <p>
         El perfil no es una cuenta de acceso. La vinculación mostrada no informa el estado de la
         cuenta ni sus permisos o asignaciones.

@@ -25,6 +25,10 @@ import { UsersLayout } from '../modules/users/components/UsersLayout';
 import { UsersListPage } from '../modules/users/pages/UsersListPage';
 import { UserDetailPage } from '../modules/users/pages/UserDetailPage';
 import { CreateUserPage } from '../modules/users/pages/CreateUserPage';
+import { AssignmentsLayout } from '../modules/assignments/components/AssignmentsLayout';
+import { AssignmentsListPage } from '../modules/assignments/pages/AssignmentsListPage';
+import { AssignmentDetailPage } from '../modules/assignments/pages/AssignmentDetailPage';
+import { CreateAssignmentPage } from '../modules/assignments/pages/CreateAssignmentPage';
 
 export const routes: RouteObject[] = [
   {
@@ -39,6 +43,15 @@ export const routes: RouteObject[] = [
             element: <AuthenticatedLayout />,
             children: [
               { index: true, element: <SessionHomePage /> },
+              {
+                path: 'asignaciones',
+                element: <AssignmentsLayout />,
+                children: [
+                  { index: true, element: <AssignmentsListPage /> },
+                  { path: 'nueva', element: <CreateAssignmentPage /> },
+                  { path: ':id', element: <AssignmentDetailPage /> },
+                ],
+              },
               {
                 path: 'cuentas',
                 element: <UsersLayout />,

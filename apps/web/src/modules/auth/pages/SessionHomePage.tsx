@@ -23,6 +23,7 @@ const sections = [
   { label: 'Crear observador', permission: 'observers:create', roles: ['ADMIN', 'ENLACE'] },
   { label: 'Crear módulo', permission: 'attention-modules:create', roles: ['ADMIN', 'ENLACE'] },
   { label: 'Asignaciones', permission: 'assignments:read', roles: ['ADMIN', 'ENLACE'] },
+  { label: 'Crear asignación', permission: 'assignments:create', roles: ['ADMIN', 'ENLACE'] },
   { label: 'Cuentas', permission: 'users:read', roles: ['ADMIN'] },
   { label: 'Crear cuenta', permission: 'users:create', roles: ['ADMIN'] },
 ];
@@ -30,7 +31,10 @@ const sections = [
 export function SessionHomePage() {
   const { user } = useSession();
   const available = sections.filter(
-    (item) => user && item.roles.includes(user.role) && user.permissions.includes(item.permission),
+    (item) =>
+      user &&
+      (item.permission.startsWith('assignments:') || item.roles.includes(user.role)) &&
+      user.permissions.includes(item.permission),
   );
   return (
     <section className="space-y-4">
@@ -55,27 +59,33 @@ export function SessionHomePage() {
                   'observers:create',
                   'users:read',
                   'users:create',
+                  'assignments:read',
+                  'assignments:create',
                 ].includes(item.permission) ? (
                   <Link
                     className="inline-flex min-h-touch items-center text-primary underline"
                     to={
-                      item.permission === 'users:read'
-                        ? '/cuentas'
-                        : item.permission === 'users:create'
-                          ? '/cuentas/nueva'
-                          : item.permission === 'observers:read'
-                            ? '/observadores'
-                            : item.permission === 'observers:create'
-                              ? '/observadores/nuevo'
-                              : item.permission === 'attention-modules:read'
-                                ? '/modulos'
-                                : item.permission === 'attention-modules:create'
-                                  ? '/modulos/nuevo'
-                                  : item.permission === 'operatives:read'
-                                    ? '/operativos'
-                                    : item.permission === 'operatives:create'
-                                      ? '/operativos/nuevo'
-                                      : '/mi-asistencia'
+                      item.permission === 'assignments:read'
+                        ? '/asignaciones'
+                        : item.permission === 'assignments:create'
+                          ? '/asignaciones/nueva'
+                          : item.permission === 'users:read'
+                            ? '/cuentas'
+                            : item.permission === 'users:create'
+                              ? '/cuentas/nueva'
+                              : item.permission === 'observers:read'
+                                ? '/observadores'
+                                : item.permission === 'observers:create'
+                                  ? '/observadores/nuevo'
+                                  : item.permission === 'attention-modules:read'
+                                    ? '/modulos'
+                                    : item.permission === 'attention-modules:create'
+                                      ? '/modulos/nuevo'
+                                      : item.permission === 'operatives:read'
+                                        ? '/operativos'
+                                        : item.permission === 'operatives:create'
+                                          ? '/operativos/nuevo'
+                                          : '/mi-asistencia'
                     }
                   >
                     {item.label}
