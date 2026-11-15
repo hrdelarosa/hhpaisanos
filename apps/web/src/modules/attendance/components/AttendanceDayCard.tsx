@@ -1,6 +1,7 @@
+import type { ReactNode } from 'react';
 import type { AttendanceDay, AttendanceMark } from '../schemas/attendance';
 
-const reviewLabels = {
+export const reviewLabels = {
   accepted_automatic: 'Aceptada automáticamente',
   pending_review: 'Pendiente de revisión',
   accepted_administrative: 'Aceptada administrativamente',
@@ -26,7 +27,13 @@ const completenessLabels = {
   complete: 'Entrada y salida registradas',
 };
 
-function Mark({ label, mark }: { label: string; mark: AttendanceMark | null }) {
+export function AttendanceMarkView({
+  label,
+  mark,
+}: {
+  label: string;
+  mark: AttendanceMark | null;
+}) {
   return (
     <section className="min-w-0 space-y-2 rounded-md bg-muted p-4">
       <h3 className="text-subheading">{label}</h3>
@@ -62,7 +69,7 @@ function Mark({ label, mark }: { label: string; mark: AttendanceMark | null }) {
   );
 }
 
-export function AttendanceDayCard({ day }: { day: AttendanceDay }) {
+export function AttendanceDayCard({ day, children }: { day: AttendanceDay; children?: ReactNode }) {
   return (
     <article className="space-y-4 rounded-lg border bg-card p-4 text-card-foreground sm:p-6">
       <h2 className="text-heading-sm">
@@ -84,9 +91,10 @@ export function AttendanceDayCard({ day }: { day: AttendanceDay }) {
           <dd>{completenessLabels[day.completeness]}</dd>
         </div>
       </dl>
+      {children}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Mark label="Entrada" mark={day.checkIn} />
-        <Mark label="Salida" mark={day.checkOut} />
+        <AttendanceMarkView label="Entrada" mark={day.checkIn} />
+        <AttendanceMarkView label="Salida" mark={day.checkOut} />
       </div>
     </article>
   );

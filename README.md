@@ -158,9 +158,48 @@ focus/reconnect checks, not by an invented renewal mechanism.
   Administrative acceptance does not hide anomalies; missing marks never imply an
   absence or verified physical presence. Loading, empty, denied and error states
   are explicit, with manual retry and existing session-expiration behavior.
-- No check-in/check-out controls, mutations, location capture, administrative views
-  or backend changes are included. F3 still needs its separately approved capture
-  UX, including location fallback, idempotency and uncertain-result handling.
+- F2 adds no capture or administrative operations. The F3 extension below adds
+  personal capture only, without backend changes.
+
+### Personal Attendance capture (F3)
+
+- `/mi-asistencia` offers entry only when neither mark exists, and exit only when
+  a usable current entry exists with no exit. Rejected/annulled entries cannot
+  authorize exit. Both the OBSERVADOR role and `attendance:capture-own` are required;
+  existing own-read permission is still required to enter the Attendance screens.
+  The API remains authoritative for ownership, eligibility, dates and ordering.
+- Only an explicit capture click requests browser geolocation. A 15-second bound
+  includes the permission wait; unsupported/insecure contexts, denied permission,
+  unavailable position, timeout and unexpected/invalid evidence map to the existing
+  controlled missing-location union. Missing evidence does not block submission and
+  requires administrative review. There is no geofence, accuracy policy or selfie.
+- One random idempotency key per intention; operation, server date, assignment and
+  validated evidence are frozen before the first POST. Duplicate clicks are locked
+  immediately. Network failures, timeout (25 seconds), invalid success responses,
+  server errors, authorization errors and uncoded conflicts retain the exact request
+  for explicit retry, without new GPS or automatic write retries. Coded terminal
+  rejections (`day_changed`, `initial_mark_exists`, `invalid_order`, `ineligible`)
+  are distinguished from those recoverable outcomes. No client midnight calculation
+  or silent expected-date rewrite is performed; completed replay is decided by the API.
+- An app-lifetime Attendance runtime holds pending evidence privately in memory,
+  outside route components and the session Query subtree. It keys requests by user
+  ID, exposes only sanitized progress/result snapshots and never shares a request
+  across accounts. Same-account reauthentication can explicitly retry its retained
+  request. A session transition during location acquisition prevents submission;
+  an already-sent request can still settle for its original account. Logging out
+  does not claim an in-flight write was cancelled.
+- POSTs reuse same-origin HttpOnly cookies and CSRF transport. TanStack mutations
+  carry no evidence in variables/data/context/meta/errors and are removed after
+  settling. No GPS, keys or request bodies enter browser storage, analytics or logs.
+  Successful writes invalidate Attendance queries; the final view reads the current
+  mark and anomalies through the own-history API. Receipt success state is explicitly
+  labelled as the original state, distinct from current administrative review.
+- Reload/closing the app loses the in-memory request. The screen warns that rereading
+  current marks cannot recover its exact receipt. Review current marks before a new
+  deliberate capture; an uncertain outcome is never declared successful merely from
+  a matching local intention or a lost response.
+- No administrative screens, backend changes/migrations, Telegram, offline capture
+  or selfie upload. Permission/link/assignment provisioning remains separately managed.
 
 ### Browser checks with Playwright CLI (P0)
 
