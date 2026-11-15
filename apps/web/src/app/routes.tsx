@@ -13,6 +13,10 @@ import { OperativesLayout } from '../modules/operatives/components/OperativesLay
 import { OperativesListPage } from '../modules/operatives/pages/OperativesListPage';
 import { CreateOperativePage } from '../modules/operatives/pages/CreateOperativePage';
 import { OperativeDetailPage } from '../modules/operatives/pages/OperativeDetailPage';
+import { ModulesLayout } from '../modules/attention-modules/components/ModulesLayout';
+import { ModulesListPage } from '../modules/attention-modules/pages/ModulesListPage';
+import { CreateModulePage } from '../modules/attention-modules/pages/CreateModulePage';
+import { ModuleDetailPage } from '../modules/attention-modules/pages/ModuleDetailPage';
 
 export const routes: RouteObject[] = [
   {
@@ -27,6 +31,15 @@ export const routes: RouteObject[] = [
             element: <AuthenticatedLayout />,
             children: [
               { index: true, element: <SessionHomePage /> },
+              {
+                path: 'modulos',
+                element: <ModulesLayout />,
+                children: [
+                  { index: true, element: <ModulesListPage /> },
+                  { path: 'nuevo', element: <CreateModulePage /> },
+                  { path: ':id', element: <ModuleDetailPage /> },
+                ],
+              },
               {
                 path: 'operativos',
                 element: <OperativesLayout />,
