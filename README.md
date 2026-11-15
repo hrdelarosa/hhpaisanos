@@ -201,6 +201,44 @@ focus/reconnect checks, not by an invented renewal mechanism.
 - No administrative screens, backend changes/migrations, Telegram, offline capture
   or selfie upload. Permission/link/assignment provisioning remains separately managed.
 
+### Administrative Operatives management (F4A)
+
+- `/operativos` lists real Guerrero-wide operatives with name (literal substring),
+  status, page and limit filters in the URL through nuqs. Ordering is fixed by the
+  API (start date descending, then ID descending); no office filter is introduced.
+- `/operativos/nuevo` validates the existing name/civil-date contract with React
+  Hook Form and Zod and creates only drafts. Confirmed creation invalidates Operatives
+  queries. Without read permission, creation confirms in place instead of opening
+  an unauthorized detail. Server errors preserve inputs; uncertain results are not
+  reported as success or automatically retried.
+- `/operativos/:id` selects the administrative operative context in the route and
+  shows its state, dates, configured tolerance and full-precision UTC metadata.
+  Links from the list preserve filters for returning to the same selection. There
+  is no persisted global operative selection or administration of other modules.
+- Listing/details require `operatives:read`, creation requires `operatives:create`,
+  and activation requires `operatives:activate`. Home navigation preserves the
+  approved ADMIN/ENLACE grant matrix; ADMIN never bypasses explicit permissions.
+  The API remains authoritative, including permission revocation and session expiry.
+- Activation requires an explicitly entered integer tolerance (0–65535, no default)
+  and a nonblank administrative reason (up to 500 Unicode code points). It rereads
+  the operative before showing a separate confirmation and again before submission.
+  A changed state/version requires reviewing and confirming again. Only the server
+  determines civil-day eligibility in `America/Mexico_City`; expired/invalid periods,
+  incompatible transitions and concurrent writes remain visible errors. There are
+  no optimistic changes or automatic POST retries. Activation invalidates list/detail
+  queries, and tolerance cannot be edited afterward.
+- Responsive list, detail and forms provide explicit loading, empty, error and
+  retry states. Focused Vitest/RTL tests cover permissions, contracts, confirmation,
+  conflicts and query invalidation. Targeted Playwright CLI validation used a real
+  Nest API with a disposable `hhpaisanos_test_*` MySQL database/user and synthetic
+  accounts, without touching shared development tables. It exercised creation,
+  activation, URL filters, pagination, duplicate/expired conflicts, a concurrent
+  activation before confirmation, and 390px layouts.
+
+F4A adds no backend changes, migrations, editing, closure, reopening, Attention
+Modules, Observers, Assignments or administrative Attendance screens. Existing
+schema migrations and centrally provisioned permissions remain deployment prerequisites.
+
 ### Browser checks with Playwright CLI (P0)
 
 The official [`@playwright/cli`](https://github.com/microsoft/playwright-cli) is
