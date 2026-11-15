@@ -9,6 +9,10 @@ import { SessionHomePage } from '../modules/auth/pages/SessionHomePage';
 import { AttendanceLayout } from '../modules/attendance/components/AttendanceLayout';
 import { TodayAttendancePage } from '../modules/attendance/pages/TodayAttendancePage';
 import { AttendanceHistoryPage } from '../modules/attendance/pages/AttendanceHistoryPage';
+import { OperativesLayout } from '../modules/operatives/components/OperativesLayout';
+import { OperativesListPage } from '../modules/operatives/pages/OperativesListPage';
+import { CreateOperativePage } from '../modules/operatives/pages/CreateOperativePage';
+import { OperativeDetailPage } from '../modules/operatives/pages/OperativeDetailPage';
 
 export const routes: RouteObject[] = [
   {
@@ -23,6 +27,15 @@ export const routes: RouteObject[] = [
             element: <AuthenticatedLayout />,
             children: [
               { index: true, element: <SessionHomePage /> },
+              {
+                path: 'operativos',
+                element: <OperativesLayout />,
+                children: [
+                  { index: true, element: <OperativesListPage /> },
+                  { path: 'nuevo', element: <CreateOperativePage /> },
+                  { path: ':id', element: <OperativeDetailPage /> },
+                ],
+              },
               {
                 path: 'mi-asistencia',
                 element: <AttendanceLayout />,

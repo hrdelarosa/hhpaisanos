@@ -10,6 +10,11 @@ const sections = [
   },
   { label: 'Operativos', permission: 'operatives:read', roles: ['ADMIN', 'ENLACE'] },
   {
+    label: 'Crear operativo',
+    permission: 'operatives:create',
+    roles: ['ADMIN', 'ENLACE'],
+  },
+  {
     label: 'Módulos de atención',
     permission: 'attention-modules:read',
     roles: ['ADMIN', 'ENLACE'],
@@ -37,10 +42,18 @@ export function SessionHomePage() {
           <ul className="space-y-2">
             {available.map((item) => (
               <li key={item.permission}>
-                {item.permission === 'attendance:read-own' ? (
+                {['attendance:read-own', 'operatives:read', 'operatives:create'].includes(
+                  item.permission,
+                ) ? (
                   <Link
                     className="inline-flex min-h-touch items-center text-primary underline"
-                    to="/mi-asistencia"
+                    to={
+                      item.permission === 'operatives:read'
+                        ? '/operativos'
+                        : item.permission === 'operatives:create'
+                          ? '/operativos/nuevo'
+                          : '/mi-asistencia'
+                    }
                   >
                     {item.label}
                   </Link>
