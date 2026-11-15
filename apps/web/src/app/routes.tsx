@@ -21,6 +21,10 @@ import { ObserversLayout } from '../modules/observers/components/ObserversLayout
 import { ObserversListPage } from '../modules/observers/pages/ObserversListPage';
 import { CreateObserverPage } from '../modules/observers/pages/CreateObserverPage';
 import { ObserverDetailPage } from '../modules/observers/pages/ObserverDetailPage';
+import { UsersLayout } from '../modules/users/components/UsersLayout';
+import { UsersListPage } from '../modules/users/pages/UsersListPage';
+import { UserDetailPage } from '../modules/users/pages/UserDetailPage';
+import { CreateUserPage } from '../modules/users/pages/CreateUserPage';
 
 export const routes: RouteObject[] = [
   {
@@ -35,6 +39,15 @@ export const routes: RouteObject[] = [
             element: <AuthenticatedLayout />,
             children: [
               { index: true, element: <SessionHomePage /> },
+              {
+                path: 'cuentas',
+                element: <UsersLayout />,
+                children: [
+                  { index: true, element: <UsersListPage /> },
+                  { path: 'nueva', element: <CreateUserPage /> },
+                  { path: ':id', element: <UserDetailPage /> },
+                ],
+              },
               {
                 path: 'observadores',
                 element: <ObserversLayout />,

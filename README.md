@@ -305,8 +305,50 @@ remain prerequisites.
 - Loading, empty, retry, validation, conflict and permission errors are covered, with
   mobile layouts. See [F4C validation](docs/F4C_OBSERVERS_VALIDATION.md) for test results.
 
-No backend changes, migrations, account provisioning/linking, assignment or administrative
-Attendance UI are added. F5 is not started; its scope must be approved separately.
+F4C adds no backend changes, migrations, account provisioning/linking, assignment or
+administrative Attendance UI. Account administration and linking are described under F5.
+
+### Administrative accounts and supervised linking (F5)
+
+- `/cuentas` and `/cuentas/:id` require ADMIN **and** `users:read`. Supported URL
+  filters are `search` (literal username/full-name substring, 150 code points),
+  `active`, `roleId` (UUIDv7), `page` and `pageSize`. Account status, mandatory password
+  change and last login are displayed exactly as projected; temporary lockouts,
+  role activity, sessions and linking evidence are not exposed and are not inferred.
+- `/cuentas/nueva` uses the existing `POST /api/users` with `users:create` and the
+  read-only `GET /api/roles` catalog with `roles:read`. Only active ENLACE/OBSERVADOR
+  roles can be selected for initial classification; this is not a role editor.
+  The one-time temporary password stays only in component memory, masked, outside
+  Query caches/storage/logs, until dismissed or leaving the screen. Deliver it via
+  an approved channel. Lost responses block resubmission and require checking the
+  list; a lost credential requires the separately authorized out-of-UI process.
+- Account name edits use `PATCH /api/users/:id` (`users:update`); status changes
+  use `PATCH /api/users/:id/status` (`users:change-status`). Both require reasons,
+  fresh reads and confirmation. ADMIN accounts are read-only. Deactivation revokes
+  account sessions without modifying the profile/link/assignments; reactivation
+  does not restore sessions. No password resets, role changes or permission editor.
+- Existing `/observadores` filtering and details show current relationships and
+  eligible active/unlinked profiles. Details offer supervised linking only with
+  `observers:read` plus `observers:link-account`. ENLACE never accesses Users or role
+  catalogs. Exact username lookup uses `GET /api/observers/linkable-account` and
+  linking uses `PUT /api/observers/:id/account` with `userId`, required `reason`,
+  and `verificationMethod: "supervised_administrative"`.
+- Before confirmation the operator must attest to approved identity verification,
+  witnessing an independent sign-in using definitive credentials, and the exact
+  pairing. Names/phones/UUIDs are not identity evidence; passwords/documents must
+  not be requested or included in reasons. The backend rechecks eligibility and
+  uniqueness transactionally, revokes target sessions and records the evidence.
+  The UI does not claim cryptographic consent or certify legacy relationships.
+- No unlink/replacement endpoint exists. Existing relationships are shown without
+  mutation controls. Missing/ineligible account lookup shares 404; conflicts and
+  revoked authority are separate from uncertain network/5xx outcomes. There are no
+  optimistic updates or automatic retries. Confirmed and uncertain mutations
+  invalidate relevant account/profile queries in the identity-isolated Query client.
+  Fresh reads cannot eliminate the final GET/write race; server rules remain authoritative.
+
+See [F5 validation](docs/F5_USERS_LINKING_VALIDATION.md) for contracts, results,
+limitations and F6 prerequisites. No backend changes, migrations or shared-database
+provisioning are part of F5.
 
 ### Browser checks with Playwright CLI (P0)
 

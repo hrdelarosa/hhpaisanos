@@ -158,14 +158,14 @@ it('refreshes committed edits after a lost response without claiming mutation su
   );
   expect((screen.getByLabelText('Motivo de edición') as HTMLInputElement).value).toBe('');
 });
-it('shows a linked account only as server-provided metadata, never linking or provisioning controls', async () => {
+it('shows a linked account as metadata without replacement or provisioning controls', async () => {
   const userId = '019a7fb0-0000-7000-8000-000000000002';
   mount(`/observadores/${id}`, () => Response.json({ ...observer, userId }), {
     ...user,
     permissions: [...user.permissions, 'observers:link-account', 'users:create'],
   });
   await detail();
-  expect(screen.getByText(userId)).toBeTruthy();
+  expect(screen.getByText(userId, { selector: 'dd' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: /vincular|cuenta|asignación/i })).toBeNull();
 });
 it('filters by literal name search, active and linked, resets page and paginates', async () => {
