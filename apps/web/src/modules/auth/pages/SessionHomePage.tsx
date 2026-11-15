@@ -20,6 +20,7 @@ const sections = [
     roles: ['ADMIN', 'ENLACE'],
   },
   { label: 'Observadores', permission: 'observers:read', roles: ['ADMIN', 'ENLACE'] },
+  { label: 'Crear observador', permission: 'observers:create', roles: ['ADMIN', 'ENLACE'] },
   { label: 'Crear módulo', permission: 'attention-modules:create', roles: ['ADMIN', 'ENLACE'] },
   { label: 'Asignaciones', permission: 'assignments:read', roles: ['ADMIN', 'ENLACE'] },
   { label: 'Cuentas', permission: 'users:read', roles: ['ADMIN'] },
@@ -49,19 +50,25 @@ export function SessionHomePage() {
                   'operatives:create',
                   'attention-modules:read',
                   'attention-modules:create',
+                  'observers:read',
+                  'observers:create',
                 ].includes(item.permission) ? (
                   <Link
                     className="inline-flex min-h-touch items-center text-primary underline"
                     to={
-                      item.permission === 'attention-modules:read'
-                        ? '/modulos'
-                        : item.permission === 'attention-modules:create'
-                          ? '/modulos/nuevo'
-                          : item.permission === 'operatives:read'
-                            ? '/operativos'
-                            : item.permission === 'operatives:create'
-                              ? '/operativos/nuevo'
-                              : '/mi-asistencia'
+                      item.permission === 'observers:read'
+                        ? '/observadores'
+                        : item.permission === 'observers:create'
+                          ? '/observadores/nuevo'
+                          : item.permission === 'attention-modules:read'
+                            ? '/modulos'
+                            : item.permission === 'attention-modules:create'
+                              ? '/modulos/nuevo'
+                              : item.permission === 'operatives:read'
+                                ? '/operativos'
+                                : item.permission === 'operatives:create'
+                                  ? '/operativos/nuevo'
+                                  : '/mi-asistencia'
                     }
                   >
                     {item.label}

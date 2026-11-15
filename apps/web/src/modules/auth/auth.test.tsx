@@ -228,7 +228,7 @@ it('hides private content immediately during logout and supports retry on uncert
 
 it.each([
   [observer, 'Asistencia personal', 'Cuentas · Próximamente'],
-  [{ ...admin, role: 'ENLACE' }, 'Observadores · Próximamente', 'Cuentas · Próximamente'],
+  [{ ...admin, role: 'ENLACE' }, 'Observadores', 'Cuentas · Próximamente'],
   [admin, 'Cuentas · Próximamente', 'Asistencia personal'],
 ])(
   'renders only effective role/permission capabilities for $role',
