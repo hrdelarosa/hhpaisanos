@@ -17,6 +17,10 @@ import { ModulesLayout } from '../modules/attention-modules/components/ModulesLa
 import { ModulesListPage } from '../modules/attention-modules/pages/ModulesListPage';
 import { CreateModulePage } from '../modules/attention-modules/pages/CreateModulePage';
 import { ModuleDetailPage } from '../modules/attention-modules/pages/ModuleDetailPage';
+import { ObserversLayout } from '../modules/observers/components/ObserversLayout';
+import { ObserversListPage } from '../modules/observers/pages/ObserversListPage';
+import { CreateObserverPage } from '../modules/observers/pages/CreateObserverPage';
+import { ObserverDetailPage } from '../modules/observers/pages/ObserverDetailPage';
 
 export const routes: RouteObject[] = [
   {
@@ -31,6 +35,15 @@ export const routes: RouteObject[] = [
             element: <AuthenticatedLayout />,
             children: [
               { index: true, element: <SessionHomePage /> },
+              {
+                path: 'observadores',
+                element: <ObserversLayout />,
+                children: [
+                  { index: true, element: <ObserversListPage /> },
+                  { path: 'nuevo', element: <CreateObserverPage /> },
+                  { path: ':id', element: <ObserverDetailPage /> },
+                ],
+              },
               {
                 path: 'modulos',
                 element: <ModulesLayout />,

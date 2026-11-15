@@ -275,9 +275,38 @@ schema migrations and centrally provisioned permissions remain deployment prereq
   existing/cancelled assignment conflicts, allowed status changes with assignments,
   read-only permissions, concurrency, filters, pagination and 390px layouts.
 
-No backend changes, migrations, Observer/Assignment management or administrative
-Attendance screens are added. F4C still needs its separately approved scope;
-existing migrations and explicit centralized permission provisioning remain prerequisites.
+F4B adds no backend changes, migrations, Observer/Assignment management or administrative
+Attendance screens. Existing migrations and explicit centralized permission provisioning
+remain prerequisites.
+
+### Administrative Observer management (F4C)
+
+- `/observadores` lists profiles across Guerrero with URL-backed `search`, `active`,
+  `linked`, `page` and `pageSize`. The last two default to 1/20 and are bounded at
+  1,000,000/100. Search is a literal substring in either name field; records retain
+  the API's creation-time/ID ascending order. Filters survive detail/return navigation.
+- `/observadores/nuevo` creates an active, accountless profile. `/observadores/:id`
+  displays the actual profile projection, including nullable phone/account ID and
+  full-precision UTC MySQL timestamps. Account status, assignments and linking
+  evidence are not inferred from this projection.
+- Creation/editing use React Hook Form and Zod: names allow 100 Unicode code points
+  each, nonempty phones 20, without trimming or changing spelling. Empty phone sends
+  `null`; updates send changed fields only and require a nonblank reason (500 points).
+- `PATCH /api/observers/:id/status` supports active/inactive in both directions,
+  with a required reason, fresh reads and explicit confirmation. It does not modify
+  account status, sessions or assignments. The UI uses the exact `observers:read`,
+  `observers:create`, `observers:update` and `observers:change-status` session grants;
+  ADMIN has no bypass. Existing HttpOnly cookies and CSRF transport are unchanged.
+- Writes are never optimistic or automatically retried. Query invalidation reconciles
+  confirmed and uncertain results. Edits require explicit fresh reload after a submission;
+  uncertain creation requires checking for an already-created profile before resubmitting.
+  The API has neither profile uniqueness nor idempotent creation nor version preconditions:
+  duplicate people and the residual last-GET/PATCH race cannot be ruled out by the web.
+- Loading, empty, retry, validation, conflict and permission errors are covered, with
+  mobile layouts. See [F4C validation](docs/F4C_OBSERVERS_VALIDATION.md) for test results.
+
+No backend changes, migrations, account provisioning/linking, assignment or administrative
+Attendance UI are added. F5 is not started; its scope must be approved separately.
 
 ### Browser checks with Playwright CLI (P0)
 
