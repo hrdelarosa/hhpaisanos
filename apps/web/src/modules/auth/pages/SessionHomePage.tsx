@@ -24,6 +24,7 @@ const sections = [
   { label: 'Crear módulo', permission: 'attention-modules:create', roles: ['ADMIN', 'ENLACE'] },
   { label: 'Asignaciones', permission: 'assignments:read', roles: ['ADMIN', 'ENLACE'] },
   { label: 'Cuentas', permission: 'users:read', roles: ['ADMIN'] },
+  { label: 'Crear cuenta', permission: 'users:create', roles: ['ADMIN'] },
 ];
 
 export function SessionHomePage() {
@@ -52,23 +53,29 @@ export function SessionHomePage() {
                   'attention-modules:create',
                   'observers:read',
                   'observers:create',
+                  'users:read',
+                  'users:create',
                 ].includes(item.permission) ? (
                   <Link
                     className="inline-flex min-h-touch items-center text-primary underline"
                     to={
-                      item.permission === 'observers:read'
-                        ? '/observadores'
-                        : item.permission === 'observers:create'
-                          ? '/observadores/nuevo'
-                          : item.permission === 'attention-modules:read'
-                            ? '/modulos'
-                            : item.permission === 'attention-modules:create'
-                              ? '/modulos/nuevo'
-                              : item.permission === 'operatives:read'
-                                ? '/operativos'
-                                : item.permission === 'operatives:create'
-                                  ? '/operativos/nuevo'
-                                  : '/mi-asistencia'
+                      item.permission === 'users:read'
+                        ? '/cuentas'
+                        : item.permission === 'users:create'
+                          ? '/cuentas/nueva'
+                          : item.permission === 'observers:read'
+                            ? '/observadores'
+                            : item.permission === 'observers:create'
+                              ? '/observadores/nuevo'
+                              : item.permission === 'attention-modules:read'
+                                ? '/modulos'
+                                : item.permission === 'attention-modules:create'
+                                  ? '/modulos/nuevo'
+                                  : item.permission === 'operatives:read'
+                                    ? '/operativos'
+                                    : item.permission === 'operatives:create'
+                                      ? '/operativos/nuevo'
+                                      : '/mi-asistencia'
                     }
                   >
                     {item.label}

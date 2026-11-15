@@ -6,6 +6,7 @@ import { useSession } from '../../auth/hooks/use-session';
 import { observerQuery } from '../api/observers';
 import { EditObserver } from '../components/EditObserver';
 import { ChangeObserverStatus } from '../components/ChangeObserverStatus';
+import { LinkObserverAccount } from '../components/LinkObserverAccount';
 import { observerError } from '../utils/feedback';
 
 export function ObserverDetailPage() {
@@ -82,6 +83,7 @@ export function ObserverDetailPage() {
       <Button variant="secondary" disabled={query.isFetching} onClick={() => void query.refetch()}>
         Consultar estado actual
       </Button>
+      <LinkObserverAccount key={`link-${id}`} observer={observer} />
       {user?.permissions.includes('observers:update') && (
         <EditObserver key={`edit-${id}`} observer={observer} />
       )}
