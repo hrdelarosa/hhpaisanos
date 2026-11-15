@@ -60,7 +60,7 @@ apps/api/src/modules/users/ Account administration and read-only access catalogs
 apps/api/src/modules/observers/ Observer profile administration independent of accounts
 apps/web/src/         Single React application
 apps/web/src/app/     Composition, providers, routing and base layout
-apps/web/src/modules/ Module-specific API integrations and pages (health only in F1A)
+apps/web/src/modules/ Feature-specific API integrations, schemas and pages
 apps/web/src/lib/     Same-origin JSON HTTP transport and shadcn class utility
 apps/web/src/styles/  Semantic Tailwind/shadcn tokens from root DESIGN.md
 docs/                Functional requirements and proposed database model
@@ -108,9 +108,8 @@ there are no runtime font CDN requests.
 - `/login`: uncontrolled React Hook Form inputs with Zod validation. Passwords
   exist only in the input/form submission lifecycle and are cleared after sending;
   they are never copied to application state, Query mutation variables or logs.
-- `/`: authenticated session home. Future operational sections are listed only
-  for effective role/permission combinations and explicitly marked unavailable;
-  there are no Attendance or administration screens yet.
+- `/`: authenticated session home. Operational sections are listed only for
+  effective role/permission combinations; unimplemented sections are marked unavailable.
 - `/cambiar-contrasena`: mandatory or voluntary change. Mandatory-change sessions
   can only use this screen and logout. A confirmed change revokes all sessions
   and requires a new login; a `401` from this endpoint triggers `/auth/me`
@@ -138,6 +137,30 @@ are single-flight and deliberately bypass MutationCache to avoid credential
 retention. Route visibility is not authorization: API guards remain authoritative.
 There is no client expiry clock; revocation is detected by server responses and
 focus/reconnect checks, not by an invented renewal mechanism.
+
+### Personal Attendance read views (F2)
+
+- `/mi-asistencia` uses `GET /api/attendance/me/today` for the server civil date,
+  timezone, eligible assignments, schedules and current marks. No eligible assignment
+  is distinct from an eligible assignment with no marks.
+- `/mi-asistencia/historial` uses `GET /api/attendance/me`, with only the supported
+  `from`, `to`, `page` (1–1,000,000) and `limit` (1–100) parameters. nuqs preserves
+  filters/pagination in the URL, resets the page when filters change and supports
+  browser navigation. Invalid date ranges do not issue requests.
+- Both routes require an authenticated OBSERVADOR with `attendance:read-own` in the
+  UI; the API independently authorizes the active, accredited profile and ownership.
+  Queries reuse the identity-isolated session Query client and abortable HTTP transport.
+- Zod validates the read-view projection and strips other fields before caching.
+  GPS coordinates and receipt payloads are neither cached nor rendered. Official
+  UTC timestamps retain the server's fractional precision; scheduled hours use
+  `America/Mexico_City`. No browser clock determines the displayed civil date.
+- Capture completeness, individual review and factual anomalies remain separate.
+  Administrative acceptance does not hide anomalies; missing marks never imply an
+  absence or verified physical presence. Loading, empty, denied and error states
+  are explicit, with manual retry and existing session-expiration behavior.
+- No check-in/check-out controls, mutations, location capture, administrative views
+  or backend changes are included. F3 still needs its separately approved capture
+  UX, including location fallback, idempotency and uncertain-result handling.
 
 ### Browser checks with Playwright CLI (P0)
 
