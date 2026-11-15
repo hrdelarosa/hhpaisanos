@@ -61,6 +61,14 @@ export function ModuleDetailPage() {
           </dd>
         </div>
       </dl>
+      {user?.permissions.includes('assignments:read') && (
+        <Link
+          className="inline-flex min-h-touch items-center text-primary underline"
+          to={`/asignaciones?attentionModuleId=${module.id}`}
+        >
+          Consultar asignaciones del módulo
+        </Link>
+      )}
       <Button variant="secondary" disabled={query.isFetching} onClick={() => void query.refetch()}>
         Consultar estado actual
       </Button>

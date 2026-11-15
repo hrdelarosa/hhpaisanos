@@ -350,6 +350,31 @@ See [F5 validation](docs/F5_USERS_LINKING_VALIDATION.md) for contracts, results,
 limitations and F6 prerequisites. No backend changes, migrations or shared-database
 provisioning are part of F5.
 
+### Persistent Assignment management (F6)
+
+- `/asignaciones` lists persistent periods with the real `observerId`, `operativeId`,
+  `attentionModuleId`, `applicableOn`, `from`, `to`, `cancelled`, `page` and `limit`
+  filters in nuqs URL state. Detail/return links retain newly changed filters too.
+- `/asignaciones/nueva` selects observers, operatives and modules using their existing
+  authorized, searchable, paginated reads; all dates and same-day hours are explicit.
+  Scheduling does not require an account link and does not authorize Attendance.
+- `/asignaciones/:id` shows effective dates, hours, cancellation, version and UTC
+  timestamps. Calendar labels are explicitly display-only. All observer periods
+  remain accessible; the read API exposes neither audit reasons nor replacement links.
+- Creation uses `POST /api/assignments`; changes, termination and cancellation use
+  `POST /api/assignments/:id/change`, `/terminate` and `/cancel`. Changes return a new
+  period or 204 for a no-op; no historical assignment or Attendance is rewritten locally.
+- Explicit session permissions gate each route/action, without ADMIN bypass. Writes
+  require fresh relevant resource reads, review/confirmation and administrative reasons
+  where required. Existing-period operations send the reviewed `expectedVersion`.
+- No optimistic updates or write retries. Conflicts require rereading/reconfirmation;
+  uncertain outcomes remain uncertain even after later reads. Confirmed/uncertain
+  outcomes invalidate assignment and Attendance queries in the isolated session client.
+  Creation ends the current intention after submission; navigate to the list before
+  creating another. No delete, reactivation, retroactive edit or inferred audit is added.
+
+See [F6 validation and API limitations](docs/F6_ASSIGNMENTS_VALIDATION.md).
+
 ### Browser checks with Playwright CLI (P0)
 
 The official [`@playwright/cli`](https://github.com/microsoft/playwright-cli) is
