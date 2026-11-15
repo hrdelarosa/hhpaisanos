@@ -65,10 +65,10 @@ export function ModuleDetailPage() {
         Consultar estado actual
       </Button>
       {user?.permissions.includes('attention-modules:update') && (
-        <EditModule key={id} module={module} />
+        <EditModule key={`edit-${id}`} module={module} />
       )}
       {user?.permissions.includes('attention-modules:change-status') && (
-        <ChangeModuleStatus key={id} module={module} />
+        <ChangeModuleStatus key={`status-${id}`} module={module} />
       )}
     </div>
   );

@@ -71,8 +71,8 @@ export function ModulesListPage() {
             <option value="false">Inactivo</option>
           </select>
         </div>
-        <label className="space-y-2" htmlFor="module-limit">
-          Registros por página
+        <div className="space-y-2">
+          <label htmlFor="module-limit">Registros por página</label>
           <Input
             id="module-limit"
             aria-describedby="module-limit-help"
@@ -89,7 +89,7 @@ export function ModulesListPage() {
           <span id="module-limit-help" className="block text-body-sm text-foreground-secondary">
             Entre 1 y 100 registros.
           </span>
-        </label>
+        </div>
       </div>
       <Button
         variant="secondary"

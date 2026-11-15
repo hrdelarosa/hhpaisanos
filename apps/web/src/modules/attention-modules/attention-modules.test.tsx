@@ -48,6 +48,21 @@ afterEach(() => {
   window.history.replaceState(null, '', '/');
 });
 
+it('keeps edit and status component identities distinct without duplicate React keys', async () => {
+  const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    mount(`/modulos/${id}`);
+    await screen.findByRole('heading', { name: module.name });
+    expect(
+      errors.mock.calls.filter(
+        ([message]) => typeof message === 'string' && message.includes('same key'),
+      ),
+    ).toHaveLength(0);
+  } finally {
+    errors.mockRestore();
+  }
+});
+
 it('lists server-provided context and preserves filters when visiting details', async () => {
   mount('/modulos?active=true');
   await screen.findByRole('rowheader', { name: module.name });
@@ -71,6 +86,7 @@ it('uses only supported URL filters, resets page, and paginates in server order'
     });
   });
   await screen.findByText('Página 2 de 3 · 3 registros');
+  expect(screen.getByRole('spinbutton', { name: 'Registros por página' })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
   await screen.findByText('Página 3 de 3 · 3 registros');
   fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: '%Nombre_' } });
