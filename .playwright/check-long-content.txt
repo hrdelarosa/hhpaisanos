@@ -1,0 +1,21 @@
+// Raw Playwright CLI run-code payload, not an imported JavaScript module.
+async function checkLongContent(page) {
+  const heading = await page.getByRole('heading', { level: 1 }).innerText();
+  if (!/\S{100}/u.test(heading))
+    throw new Error('Use a synthetic name with 100+ unbroken characters');
+  const results = [];
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    const dimensions = await page.evaluate(() => ({
+      viewport: innerWidth,
+      document: document.documentElement.scrollWidth,
+      heading: document.querySelector('h1').getBoundingClientRect().width,
+    }));
+    if (dimensions.document > width + 1 || dimensions.heading > width)
+      throw new Error(`Long content overflows at ${width}px: ${JSON.stringify(dimensions)}`);
+    if ((await page.getByRole('heading', { level: 1 }).innerText()) !== heading)
+      throw new Error('The full name must remain available');
+    results.push(dimensions);
+  }
+  return results;
+}

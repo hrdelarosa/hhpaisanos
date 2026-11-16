@@ -11,7 +11,11 @@ export function AppLayout() {
       >
         Saltar al contenido
       </a>
-      <main id="main-content" tabIndex={-1} className="mx-auto max-w-page space-y-6 p-4 sm:p-6">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto max-w-page space-y-6 p-4 wrap-anywhere sm:p-6"
+      >
         <Outlet />
       </main>
     </NuqsAdapter>
