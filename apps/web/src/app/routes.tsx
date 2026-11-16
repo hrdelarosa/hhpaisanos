@@ -32,6 +32,7 @@ import { CreateAssignmentPage } from '../modules/assignments/pages/CreateAssignm
 import { AdministrativeAttendanceLayout } from '../modules/attendance/components/AdministrativeAttendanceLayout';
 import { AdministrativeAttendanceListPage } from '../modules/attendance/pages/AdministrativeAttendanceListPage';
 import { AdministrativeAttendanceDetailPage } from '../modules/attendance/pages/AdministrativeAttendanceDetailPage';
+import { ManualAttendancePage } from '../modules/attendance/pages/ManualAttendancePage';
 
 export const routes: RouteObject[] = [
   {
@@ -51,6 +52,7 @@ export const routes: RouteObject[] = [
                 element: <AdministrativeAttendanceLayout />,
                 children: [
                   { index: true, element: <AdministrativeAttendanceListPage /> },
+                  { path: 'manual', element: <ManualAttendancePage /> },
                   { path: ':id', element: <AdministrativeAttendanceDetailPage /> },
                 ],
               },

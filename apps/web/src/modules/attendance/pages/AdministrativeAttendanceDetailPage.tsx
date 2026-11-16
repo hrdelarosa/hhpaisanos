@@ -10,6 +10,7 @@ import {
 } from '../api/administration';
 import { AdministrativeMarkCard } from '../components/AdministrativeMarkCard';
 import { ReviewAttendance } from '../components/ReviewAttendance';
+import { HistoricalAttendanceOperation } from '../components/HistoricalAttendanceOperation';
 import { reviewLabels } from '../components/AttendanceDayCard';
 import { administrativeAttendanceError } from '../utils/administration';
 
@@ -134,6 +135,16 @@ export function AdministrativeAttendanceDetailPage() {
             )}
           </section>
           <ReviewAttendance key={id} record={detail.data} />
+          <HistoricalAttendanceOperation
+            key={`${id}-correct`}
+            record={detail.data}
+            operation="correct"
+          />
+          <HistoricalAttendanceOperation
+            key={`${id}-annul`}
+            record={detail.data}
+            operation="annul"
+          />
           <section className="space-y-4">
             <h2 className="text-heading-sm">Historial de versiones y decisiones</h2>
             <p>

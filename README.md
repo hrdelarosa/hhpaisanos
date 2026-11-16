@@ -391,6 +391,20 @@ See [F6 validation and API limitations](docs/F6_ASSIGNMENTS_VALIDATION.md).
 
 See [F7 validation and API limitations](docs/F7_ATTENDANCE_REVIEW_VALIDATION.md).
 
+### Administrative Attendance historical operations (F8)
+
+- `/asistencias/manual` creates supported historical entry/exit records with explicit
+  observer, operative/assignment, civil date, full-precision UTC time, truthful missing
+  location reason and administrative reason; no GPS evidence is fabricated.
+- Existing details offer separately authorized corrections and annulments. Corrections
+  create pending-review successor versions with preserved capture evidence and a link
+  to F7 review. Annulment retains the record and history; deletion is never offered.
+- Fresh reads, frozen confirmations, exact `expectedVersion`, duplicate guards, no
+  automatic retries and settlement invalidation protect administrative/personal views.
+  Uncertain outcomes are never declared successful by a later matching read.
+
+See [F8 contracts, safeguards and validation](docs/F8_ATTENDANCE_HISTORICAL_VALIDATION.md).
+
 ### Browser checks with Playwright CLI (P0)
 
 The official [`@playwright/cli`](https://github.com/microsoft/playwright-cli) is

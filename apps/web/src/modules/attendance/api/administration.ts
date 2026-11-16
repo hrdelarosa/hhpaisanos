@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { http } from '../../../lib/http';
+import type { CorrectionInput, ManualInput } from '../schemas/historical';
 import {
   administrativeDetailSchema,
   administrativeHistorySchema,
@@ -46,6 +47,47 @@ export async function reviewAttendance(id: string, input: ReviewInput, expectedV
     await http(`/api/attendance/${id}/review`, {
       method: 'POST',
       body: { ...input, expectedVersion },
+    }),
+  );
+}
+
+export async function manualAttendance(input: ManualInput) {
+  return parse(
+    z.object({
+      id: z.uuidv7(),
+      version: z.literal(1),
+      reviewStatus: z.literal('accepted_administrative'),
+    }),
+    await http('/api/attendance/manual', { method: 'POST', body: input }),
+  );
+}
+export async function correctAttendance(
+  id: string,
+  input: CorrectionInput,
+  expectedVersion: number,
+) {
+  return parse(
+    z.object({
+      id: z.uuidv7().refine((next) => next !== id),
+      version: z.literal(expectedVersion + 1),
+      reviewStatus: z.literal('pending_review'),
+    }),
+    await http(`/api/attendance/${id}/corrections`, {
+      method: 'POST',
+      body: { ...input, expectedVersion },
+    }),
+  );
+}
+export async function annulAttendance(id: string, reason: string, expectedVersion: number) {
+  return parse(
+    z.object({
+      id: z.literal(id),
+      version: z.literal(expectedVersion),
+      reviewStatus: z.literal('annulled'),
+    }),
+    await http(`/api/attendance/${id}/annul`, {
+      method: 'POST',
+      body: { reason, expectedVersion },
     }),
   );
 }
