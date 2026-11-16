@@ -245,20 +245,20 @@ components:
 
 **Light theme — preferred default.** The main canvas is Warm Ivory (`#F7F6F2`), with white functional surfaces and Ink text. The primary brand/action color is Institutional Green (`#235B4E`); Deep Green (`#183F36`) is for hover and limited emphasis. Green Tint (`#E7F1EC`) marks selection and secondary actions. Heritage Gold (`#A48642`) is **decorative only**: no normal text, status labels, or functional indicators.
 
-| Semantic role | Token | Value | Use |
-| --- | --- | --- | --- |
-| Primary | `primary` | `#235B4E` | Main action, selected emphasis |
-| Primary foreground | `on-primary` | `#FFFFFF` | Text on primary buttons |
-| Primary hover | `primary-hover` | `#183F36` | Active hover state |
-| Secondary | `secondary` | `#E7F1EC` | Selection, secondary buttons |
-| Gold accent | `accent` | `#A48642` | Rare non-text decoration |
-| Canvas | `background` | `#F7F6F2` | Application background |
-| Card | `surface` | `#FFFFFF` | Forms, tables, panels |
-| Text | `foreground` | `#202924` | Primary content |
-| Secondary text | `foreground-secondary` | `#52615A` | Supporting metadata |
-| Muted text | `foreground-muted` | `#626F68` | Nonessential helper text |
-| Divider | `border-decorative` | `#DDE3DC` | Nonfunctional separators |
-| Input border | `border-control` | `#6E7B74` | Detectable functional edge |
+| Semantic role      | Token                  | Value     | Use                            |
+| ------------------ | ---------------------- | --------- | ------------------------------ |
+| Primary            | `primary`              | `#235B4E` | Main action, selected emphasis |
+| Primary foreground | `on-primary`           | `#FFFFFF` | Text on primary buttons        |
+| Primary hover      | `primary-hover`        | `#183F36` | Active hover state             |
+| Secondary          | `secondary`            | `#E7F1EC` | Selection, secondary buttons   |
+| Gold accent        | `accent`               | `#A48642` | Rare non-text decoration       |
+| Canvas             | `background`           | `#F7F6F2` | Application background         |
+| Card               | `surface`              | `#FFFFFF` | Forms, tables, panels          |
+| Text               | `foreground`           | `#202924` | Primary content                |
+| Secondary text     | `foreground-secondary` | `#52615A` | Supporting metadata            |
+| Muted text         | `foreground-muted`     | `#626F68` | Nonessential helper text       |
+| Divider            | `border-decorative`    | `#DDE3DC` | Nonfunctional separators       |
+| Input border       | `border-control`       | `#6E7B74` | Detectable functional edge     |
 
 **Status colors are not brand colors.** Use explicit Spanish labels and icons, never color alone. `success`/`success-surface` for server-confirmed success; `warning`/`warning-surface` for pending review, location unavailable, or warnings; `danger`/`danger-surface` for rejected/invalid/annulled conditions **only where domain semantics warrant**; `info`/`info-surface` for neutral notices. Avoid treating all green records as independently verified physical presence.
 
@@ -270,22 +270,22 @@ components:
 
 **Single web font:** Inter, with system-ui / Arial fallback. Do not request fonts from external CDNs at runtime; self-host only after approved asset/license acquisition. Use tabular numerals for hours, dates, counts, quantities, and reporting tables.
 
-| Role | Token | Size / weight | Usage |
-| --- | --- | --- | --- |
-| Caption | `caption` | 12px / 400 | Noncritical auxiliary labels only |
-| Small body | `body-sm` | 14px / 400 | Secondary data and explanations |
-| Body | `body` | 16px / 400 | Observer workflows, forms, prose |
-| Label | `label` | 14px / 500 | Inputs, controls, menus |
-| Subheading | `subheading` | 18px / 500 | Card headings |
-| Small heading | `heading-sm` | 20px / 600 | Sections |
-| Page heading | `heading` | 24px / 600 | Main screen heading |
-| Large heading | `heading-lg` | 30px / 600 | Rare top-level application headings |
+| Role          | Token        | Size / weight | Usage                               |
+| ------------- | ------------ | ------------- | ----------------------------------- |
+| Caption       | `caption`    | 12px / 400    | Noncritical auxiliary labels only   |
+| Small body    | `body-sm`    | 14px / 400    | Secondary data and explanations     |
+| Body          | `body`       | 16px / 400    | Observer workflows, forms, prose    |
+| Label         | `label`      | 14px / 500    | Inputs, controls, menus             |
+| Subheading    | `subheading` | 18px / 500    | Card headings                       |
+| Small heading | `heading-sm` | 20px / 600    | Sections                            |
+| Page heading  | `heading`    | 24px / 600    | Main screen heading                 |
+| Large heading | `heading-lg` | 30px / 600    | Rare top-level application headings |
 
 Use 600 for headings and 700 only for exceptional metric emphasis. Keep operational status labels at least 14px; do not use 12px for critical actions or validation messages. Prefer sentence case, descriptive Spanish text, and readable line length. Do not force uppercase labels throughout the app.
 
 ## Layout
 
-**System.** A responsive 4px base rhythm. Tailwind v4 uses `--spacing: 4px` as a multiplier; `p-4` means 16px. The YAML spacing tokens are *semantic documentation*, not instructions to declare a conflicting `--spacing-4` variable.
+**System.** A responsive 4px base rhythm. Tailwind v4 uses `--spacing: 4px` as a multiplier; `p-4` means 16px. The YAML spacing tokens are _semantic documentation_, not instructions to declare a conflicting `--spacing-4` variable.
 
 - **Mobile (OBSERVADOR):** one-column layout; prominent current assignment and attendance action; secondary information below. Minimum frequent touch target 44×44px, especially check-in/check-out and report submission. Respect device safe areas.
 - **Desktop (ADMIN/ENLACE):** sidebar up to 248px, top bar about 64px, content area maximum 1440px. Focused forms maximum 720px. Use 12-column layouts selectively; fewer columns where clearer.
