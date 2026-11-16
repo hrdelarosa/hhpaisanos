@@ -51,6 +51,7 @@ export function SessionHomePage() {
               <li key={item.permission}>
                 {[
                   'attendance:read-own',
+                  'attendance:read',
                   'operatives:read',
                   'operatives:create',
                   'attention-modules:read',
@@ -65,27 +66,29 @@ export function SessionHomePage() {
                   <Link
                     className="inline-flex min-h-touch items-center text-primary underline"
                     to={
-                      item.permission === 'assignments:read'
-                        ? '/asignaciones'
-                        : item.permission === 'assignments:create'
-                          ? '/asignaciones/nueva'
-                          : item.permission === 'users:read'
-                            ? '/cuentas'
-                            : item.permission === 'users:create'
-                              ? '/cuentas/nueva'
-                              : item.permission === 'observers:read'
-                                ? '/observadores'
-                                : item.permission === 'observers:create'
-                                  ? '/observadores/nuevo'
-                                  : item.permission === 'attention-modules:read'
-                                    ? '/modulos'
-                                    : item.permission === 'attention-modules:create'
-                                      ? '/modulos/nuevo'
-                                      : item.permission === 'operatives:read'
-                                        ? '/operativos'
-                                        : item.permission === 'operatives:create'
-                                          ? '/operativos/nuevo'
-                                          : '/mi-asistencia'
+                      item.permission === 'attendance:read'
+                        ? '/asistencias'
+                        : item.permission === 'assignments:read'
+                          ? '/asignaciones'
+                          : item.permission === 'assignments:create'
+                            ? '/asignaciones/nueva'
+                            : item.permission === 'users:read'
+                              ? '/cuentas'
+                              : item.permission === 'users:create'
+                                ? '/cuentas/nueva'
+                                : item.permission === 'observers:read'
+                                  ? '/observadores'
+                                  : item.permission === 'observers:create'
+                                    ? '/observadores/nuevo'
+                                    : item.permission === 'attention-modules:read'
+                                      ? '/modulos'
+                                      : item.permission === 'attention-modules:create'
+                                        ? '/modulos/nuevo'
+                                        : item.permission === 'operatives:read'
+                                          ? '/operativos'
+                                          : item.permission === 'operatives:create'
+                                            ? '/operativos/nuevo'
+                                            : '/mi-asistencia'
                     }
                   >
                     {item.label}

@@ -29,6 +29,9 @@ import { AssignmentsLayout } from '../modules/assignments/components/Assignments
 import { AssignmentsListPage } from '../modules/assignments/pages/AssignmentsListPage';
 import { AssignmentDetailPage } from '../modules/assignments/pages/AssignmentDetailPage';
 import { CreateAssignmentPage } from '../modules/assignments/pages/CreateAssignmentPage';
+import { AdministrativeAttendanceLayout } from '../modules/attendance/components/AdministrativeAttendanceLayout';
+import { AdministrativeAttendanceListPage } from '../modules/attendance/pages/AdministrativeAttendanceListPage';
+import { AdministrativeAttendanceDetailPage } from '../modules/attendance/pages/AdministrativeAttendanceDetailPage';
 
 export const routes: RouteObject[] = [
   {
@@ -43,6 +46,14 @@ export const routes: RouteObject[] = [
             element: <AuthenticatedLayout />,
             children: [
               { index: true, element: <SessionHomePage /> },
+              {
+                path: 'asistencias',
+                element: <AdministrativeAttendanceLayout />,
+                children: [
+                  { index: true, element: <AdministrativeAttendanceListPage /> },
+                  { path: ':id', element: <AdministrativeAttendanceDetailPage /> },
+                ],
+              },
               {
                 path: 'asignaciones',
                 element: <AssignmentsLayout />,
