@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 import { Link, type RouteObject } from 'react-router';
 import { HealthPage } from '../modules/health/pages/HealthPage';
 import { AppLayout } from './layouts/AppLayout';
@@ -10,29 +11,96 @@ import { AttendanceLayout } from '../modules/attendance/components/AttendanceLay
 import { TodayAttendancePage } from '../modules/attendance/pages/TodayAttendancePage';
 import { AttendanceHistoryPage } from '../modules/attendance/pages/AttendanceHistoryPage';
 import { OperativesLayout } from '../modules/operatives/components/OperativesLayout';
-import { OperativesListPage } from '../modules/operatives/pages/OperativesListPage';
-import { CreateOperativePage } from '../modules/operatives/pages/CreateOperativePage';
-import { OperativeDetailPage } from '../modules/operatives/pages/OperativeDetailPage';
 import { ModulesLayout } from '../modules/attention-modules/components/ModulesLayout';
-import { ModulesListPage } from '../modules/attention-modules/pages/ModulesListPage';
-import { CreateModulePage } from '../modules/attention-modules/pages/CreateModulePage';
-import { ModuleDetailPage } from '../modules/attention-modules/pages/ModuleDetailPage';
 import { ObserversLayout } from '../modules/observers/components/ObserversLayout';
-import { ObserversListPage } from '../modules/observers/pages/ObserversListPage';
-import { CreateObserverPage } from '../modules/observers/pages/CreateObserverPage';
-import { ObserverDetailPage } from '../modules/observers/pages/ObserverDetailPage';
 import { UsersLayout } from '../modules/users/components/UsersLayout';
-import { UsersListPage } from '../modules/users/pages/UsersListPage';
-import { UserDetailPage } from '../modules/users/pages/UserDetailPage';
-import { CreateUserPage } from '../modules/users/pages/CreateUserPage';
 import { AssignmentsLayout } from '../modules/assignments/components/AssignmentsLayout';
-import { AssignmentsListPage } from '../modules/assignments/pages/AssignmentsListPage';
-import { AssignmentDetailPage } from '../modules/assignments/pages/AssignmentDetailPage';
-import { CreateAssignmentPage } from '../modules/assignments/pages/CreateAssignmentPage';
 import { AdministrativeAttendanceLayout } from '../modules/attendance/components/AdministrativeAttendanceLayout';
-import { AdministrativeAttendanceListPage } from '../modules/attendance/pages/AdministrativeAttendanceListPage';
-import { AdministrativeAttendanceDetailPage } from '../modules/attendance/pages/AdministrativeAttendanceDetailPage';
-import { ManualAttendancePage } from '../modules/attendance/pages/ManualAttendancePage';
+
+const OperativesListPage = lazy(() =>
+  import('../modules/operatives/pages/OperativesListPage').then((m) => ({
+    default: m.OperativesListPage,
+  })),
+);
+const CreateOperativePage = lazy(() =>
+  import('../modules/operatives/pages/CreateOperativePage').then((m) => ({
+    default: m.CreateOperativePage,
+  })),
+);
+const OperativeDetailPage = lazy(() =>
+  import('../modules/operatives/pages/OperativeDetailPage').then((m) => ({
+    default: m.OperativeDetailPage,
+  })),
+);
+const ModulesListPage = lazy(() =>
+  import('../modules/attention-modules/pages/ModulesListPage').then((m) => ({
+    default: m.ModulesListPage,
+  })),
+);
+const CreateModulePage = lazy(() =>
+  import('../modules/attention-modules/pages/CreateModulePage').then((m) => ({
+    default: m.CreateModulePage,
+  })),
+);
+const ModuleDetailPage = lazy(() =>
+  import('../modules/attention-modules/pages/ModuleDetailPage').then((m) => ({
+    default: m.ModuleDetailPage,
+  })),
+);
+const ObserversListPage = lazy(() =>
+  import('../modules/observers/pages/ObserversListPage').then((m) => ({
+    default: m.ObserversListPage,
+  })),
+);
+const CreateObserverPage = lazy(() =>
+  import('../modules/observers/pages/CreateObserverPage').then((m) => ({
+    default: m.CreateObserverPage,
+  })),
+);
+const ObserverDetailPage = lazy(() =>
+  import('../modules/observers/pages/ObserverDetailPage').then((m) => ({
+    default: m.ObserverDetailPage,
+  })),
+);
+const UsersListPage = lazy(() =>
+  import('../modules/users/pages/UsersListPage').then((m) => ({ default: m.UsersListPage })),
+);
+const CreateUserPage = lazy(() =>
+  import('../modules/users/pages/CreateUserPage').then((m) => ({ default: m.CreateUserPage })),
+);
+const UserDetailPage = lazy(() =>
+  import('../modules/users/pages/UserDetailPage').then((m) => ({ default: m.UserDetailPage })),
+);
+const AssignmentsListPage = lazy(() =>
+  import('../modules/assignments/pages/AssignmentsListPage').then((m) => ({
+    default: m.AssignmentsListPage,
+  })),
+);
+const CreateAssignmentPage = lazy(() =>
+  import('../modules/assignments/pages/CreateAssignmentPage').then((m) => ({
+    default: m.CreateAssignmentPage,
+  })),
+);
+const AssignmentDetailPage = lazy(() =>
+  import('../modules/assignments/pages/AssignmentDetailPage').then((m) => ({
+    default: m.AssignmentDetailPage,
+  })),
+);
+const AdministrativeAttendanceListPage = lazy(() =>
+  import('../modules/attendance/pages/AdministrativeAttendanceListPage').then((m) => ({
+    default: m.AdministrativeAttendanceListPage,
+  })),
+);
+const AdministrativeAttendanceDetailPage = lazy(() =>
+  import('../modules/attendance/pages/AdministrativeAttendanceDetailPage').then((m) => ({
+    default: m.AdministrativeAttendanceDetailPage,
+  })),
+);
+const ManualAttendancePage = lazy(() =>
+  import('../modules/attendance/pages/ManualAttendancePage').then((m) => ({
+    default: m.ManualAttendancePage,
+  })),
+);
 
 export const routes: RouteObject[] = [
   {
