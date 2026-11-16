@@ -1,9 +1,11 @@
-import { Link, Outlet } from 'react-router';
+import { Link, Outlet, useLocation } from 'react-router';
+import { RouteContentBoundary } from '../../../app/RouteContentBoundary';
 import { Button } from '../../../components/ui/button';
 import { useSession } from '../hooks/use-session';
 
 export function AuthenticatedLayout() {
   const { user, logout, busy } = useSession();
+  const { pathname } = useLocation();
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
@@ -26,7 +28,9 @@ export function AuthenticatedLayout() {
           </Button>
         </nav>
       </header>
-      <Outlet />
+      <RouteContentBoundary pathname={pathname}>
+        <Outlet />
+      </RouteContentBoundary>
     </div>
   );
 }
