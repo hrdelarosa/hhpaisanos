@@ -4,7 +4,7 @@ export const civilDateSchema = z.iso
   .date()
   .min(10)
   .refine((date) => date >= '1000-01-01');
-const markSchema = z.object({
+export const markSchema = z.object({
   id: z.string().min(1),
   version: z.number().int().positive(),
   officialTimestamp: z.iso.datetime(),

@@ -375,6 +375,22 @@ provisioning are part of F5.
 
 See [F6 validation and API limitations](docs/F6_ASSIGNMENTS_VALIDATION.md).
 
+### Administrative Attendance review (F7)
+
+- `/asistencias` lists current records with supported server filters and nuqs pagination;
+  `/asistencias/:id` separates capture, version history and administrative decisions.
+- ADMIN/ENLACE require explicit `attendance:read`; review independently requires
+  `attendance:review`. No ADMIN bypass, office isolation or inferred absences.
+- Accept/reject uses only the existing review endpoint, required reason, reviewed
+  `expectedVersion`, fresh reads and explicit confirmation. No optimistic decisions
+  or automatic write retries; conflicts and uncertain results require fresh review.
+- Precise GPS is restricted to authorized detail, never lists or browser persistence,
+  and is not proof of physical presence. Administrative acceptance preserves anomalies.
+- Settlement invalidates administrative and personal Attendance queries in the
+  existing identity-isolated session client. No F8 capture/correction/annulment UI.
+
+See [F7 validation and API limitations](docs/F7_ATTENDANCE_REVIEW_VALIDATION.md).
+
 ### Browser checks with Playwright CLI (P0)
 
 The official [`@playwright/cli`](https://github.com/microsoft/playwright-cli) is
