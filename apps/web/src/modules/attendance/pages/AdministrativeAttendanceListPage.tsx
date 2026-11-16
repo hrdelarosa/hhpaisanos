@@ -8,8 +8,10 @@ import { administrativeFiltersSchema } from '../schemas/administration';
 import { AdministrativeMarkCard } from '../components/AdministrativeMarkCard';
 import { reviewLabels } from '../components/AttendanceDayCard';
 import { administrativeAttendanceError } from '../utils/administration';
+import { useSession } from '../../auth/hooks/use-session';
 
 export function AdministrativeAttendanceListPage() {
+  const { user } = useSession();
   const [filters, setFilters] = useQueryStates(
     {
       operativeId: parseAsString.withDefault(''),
@@ -35,6 +37,14 @@ export function AdministrativeAttendanceListPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-heading">Asistencias administrativas</h1>
+      {user?.permissions.includes('attendance:capture-manual') && (
+        <Link
+          className="inline-flex min-h-touch items-center text-primary underline"
+          to="/asistencias/manual"
+        >
+          Crear captura manual
+        </Link>
+      )}
       <p>
         Registros vigentes, ordenados por fecha descendente. La captura y la decisión administrativa
         son independientes.
