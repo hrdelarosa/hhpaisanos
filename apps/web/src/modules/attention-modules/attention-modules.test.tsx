@@ -357,6 +357,11 @@ async function prepareStatus(active = true) {
   await screen.findByRole('heading', {
     name: active ? 'Confirmar desactivación' : 'Confirmar activación',
   });
+  expect(document.activeElement).toBe(
+    screen.getByRole('heading', {
+      name: active ? 'Confirmar desactivación' : 'Confirmar activación',
+    }),
+  );
 }
 it.each([true, false])(
   'confirms %s -> inverse only after rereading state and invalidates list/detail',
@@ -374,9 +379,13 @@ it.each([true, false])(
     await prepareStatus(active);
     expect(mock.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(document.activeElement).toBe(screen.getByLabelText('Motivo del cambio de estado'));
     await prepareStatus(active);
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar cambio de estado' }));
     await screen.findByText('Cambio de estado confirmado por el servidor.');
+    expect(document.activeElement).toBe(
+      screen.getByText('Cambio de estado confirmado por el servidor.'),
+    );
     await screen.findByText(active ? 'Inactivo' : 'Activo');
     const patch = mock.mock.calls.find(
       ([url, options]) =>
@@ -430,9 +439,34 @@ it.each([400, 403, 409, 503, 'network'])(
     await prepareStatus();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar cambio de estado' }));
     await screen.findByRole('alert');
+    expect(document.activeElement).toBe(screen.getByRole('alert'));
     await screen.findByRole('button', { name: 'Revisar desactivación' });
     expect(screen.getByText('Activo')).toBeTruthy();
     expect(screen.queryByText('Cambio de estado confirmado por el servidor.')).toBeNull();
     expect(mock.mock.calls.filter(([, options]) => options?.method === 'PATCH')).toHaveLength(1);
   },
 );
+
+it('does not interrupt a user-selected navigation control during status preflight', async () => {
+  let settle!: (response: Response) => void;
+  let reads = 0;
+  mount(`/modulos/${id}`, () => {
+    reads++;
+    if (reads === 2)
+      return new Promise<Response>((resolve) => {
+        settle = resolve;
+      });
+    return Response.json(module);
+  });
+  await screen.findByLabelText('Motivo del cambio de estado');
+  fireEvent.change(screen.getByLabelText('Motivo del cambio de estado'), {
+    target: { value: 'Motivo sintético' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Revisar desactivación' }));
+  await screen.findByText('Consultando estado actual…');
+  const logout = screen.getByRole('button', { name: 'Cerrar sesión' });
+  logout.focus();
+  settle(Response.json(module));
+  await screen.findByRole('heading', { name: 'Confirmar desactivación' });
+  expect(document.activeElement).toBe(logout);
+});

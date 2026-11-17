@@ -54,6 +54,12 @@ function submitLogin() {
   fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
 }
 
+async function expectHeadingFocus(name: string) {
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name })));
+  expect(document.title).toBe(`${name} | Heroínas y Héroes Paisanos`);
+  expect(document.activeElement?.getAttribute('tabindex')).toBe('-1');
+}
+
 it('restores the session without flashing private content, including StrictMode', async () => {
   const response = deferred<Response>();
   vi.stubGlobal(
@@ -90,9 +96,11 @@ it('redirects anonymous protected navigation and logs in with JSON/CSRF then rer
   render(<App />);
   await screen.findByRole('heading', { name: 'Iniciar sesión' });
   expect(window.location.pathname).toBe('/login');
+  await expectHeadingFocus('Iniciar sesión');
   submitLogin();
   await screen.findByRole('heading', { name: 'Sesión activa' });
   const [, options] = fetchMock.mock.calls.find(([path]) => path === '/api/auth/login')!;
+  await expectHeadingFocus('Sesión activa');
   expect(options).toMatchObject({
     method: 'POST',
     credentials: 'same-origin',
@@ -164,6 +172,7 @@ it('enforces mandatory password change, validates confirmation and requires a fr
   render(<App />);
   await screen.findByRole('heading', { name: 'Cambiar contraseña' });
   expect(window.location.pathname).toBe('/cambiar-contrasena');
+  await expectHeadingFocus('Cambiar contraseña');
   expect(screen.queryByRole('navigation', { name: 'Sesión' })).toBeNull();
   fields({
     'Contraseña actual': 'synthetic-old',
@@ -177,6 +186,7 @@ it('enforces mandatory password change, validates confirmation and requires a fr
   fireEvent.click(screen.getByRole('button', { name: 'Actualizar contraseña' }));
   await screen.findByRole('heading', { name: 'Iniciar sesión' });
   expect(screen.getByText(/Contraseña actualizada/)).toBeTruthy();
+  await expectHeadingFocus('Iniciar sesión');
   const [, options] = fetchMock.mock.calls.find(([path]) => path === '/api/auth/change-password')!;
   if (typeof options?.body !== 'string') throw new Error('Expected a JSON request body');
   expect(JSON.parse(options.body)).toEqual({
@@ -218,11 +228,13 @@ it('hides private content immediately during logout and supports retry on uncert
   expect(screen.queryByText('Administración de prueba · ADMIN')).toBeNull();
   result.resolve(new Response(null, { status: 503 }));
   await screen.findByRole('heading', { name: 'Cierre de sesión sin confirmar' });
+  await expectHeadingFocus('Cierre de sesión sin confirmar');
   expect(screen.queryByRole('heading', { name: 'Sesión activa' })).toBeNull();
   fetchMock.mockResolvedValue(noContent());
   fireEvent.click(screen.getByRole('button', { name: 'Reintentar cierre de sesión' }));
   await screen.findByRole('heading', { name: 'Iniciar sesión' });
   const [, options] = fetchMock.mock.calls.find(([path]) => path === '/api/auth/logout')!;
+  await expectHeadingFocus('Iniciar sesión');
   expect(options).toMatchObject({ body: '{}', credentials: 'same-origin' });
 });
 
@@ -288,6 +300,7 @@ it.each([401, 403])(
       expect(activeClient).not.toBe(previous);
       expect(previous.getQueryData(['private'])).toBeUndefined();
       expect(screen.getByText(/expiró o fue revocada/)).toBeTruthy();
+      await expectHeadingFocus('Iniciar sesión');
     } else {
       expect(activeClient).toBe(previous);
       expect(screen.getByRole('heading', { name: 'Sesión activa' })).toBeTruthy();
@@ -314,6 +327,7 @@ it('clears private scopes on PASSWORD_CHANGE_REQUIRED and rereads the server pro
   });
   await screen.findByRole('heading', { name: 'Cambiar contraseña' });
   expect(activeClient).not.toBe(previous);
+  await expectHeadingFocus('Cambiar contraseña');
 });
 
 it.each([401, 403])(

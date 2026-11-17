@@ -1,14 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '../../../components/ui/button';
+import { useConfirmationFocus } from '../../../hooks/use-confirmation-focus';
 import { changeModuleStatus, moduleQuery, modulesKey } from '../api/attention-modules';
 import { statusSchema, type AttentionModule } from '../schemas/attention-modules';
 import { moduleError, sameModule } from '../utils/feedback';
 import { ModuleField } from './ModuleField';
 
 export function ChangeModuleStatus({ module }: { module: AttentionModule }) {
+  const section = useRef<HTMLElement>(null);
+  const summary = useRef<HTMLHeadingElement>(null);
+  const result = useRef<HTMLParagraphElement>(null);
+  const requestFocus = useConfirmationFocus();
   const client = useQueryClient();
   const [confirmation, setConfirmation] = useState<{
     module: AttentionModule;
@@ -44,12 +49,16 @@ export function ChangeModuleStatus({ module }: { module: AttentionModule }) {
     },
   });
   return (
-    <section className="max-w-form space-y-4 rounded-lg border bg-card p-4 sm:p-6">
+    <section ref={section} className="max-w-form space-y-4 rounded-lg border bg-card p-4 sm:p-6">
       <h2 className="text-heading-sm">Disponibilidad del módulo</h2>
-      {notice && <p role={mutation.isSuccess ? 'status' : 'alert'}>{notice}</p>}
+      {notice && (
+        <p ref={result} tabIndex={-1} role={mutation.isSuccess ? 'status' : 'alert'}>
+          {notice}
+        </p>
+      )}
       {confirmation ? (
         <section aria-labelledby="status-confirm-title" className="space-y-4">
-          <h3 id="status-confirm-title" className="text-subheading">
+          <h3 ref={summary} tabIndex={-1} id="status-confirm-title" className="text-subheading">
             Confirmar {confirmation.module.active ? 'desactivación' : 'activación'}
           </h3>
           <p>
@@ -72,7 +81,10 @@ export function ChangeModuleStatus({ module }: { module: AttentionModule }) {
               variant={confirmation.module.active ? 'destructive' : 'primary'}
               disabled={mutation.isPending}
               onClick={() => {
-                if (!mutation.isPending) mutation.mutate(confirmation);
+                if (!mutation.isPending) {
+                  requestFocus(() => result.current);
+                  mutation.mutate(confirmation);
+                }
               }}
             >
               {mutation.isPending ? 'Validando y enviando…' : 'Confirmar cambio de estado'}
@@ -80,7 +92,10 @@ export function ChangeModuleStatus({ module }: { module: AttentionModule }) {
             <Button
               variant="secondary"
               disabled={mutation.isPending}
-              onClick={() => setConfirmation(null)}
+              onClick={() => {
+                requestFocus(() => section.current?.querySelector('#status-reason') ?? null);
+                setConfirmation(null);
+              }}
             >
               Cancelar
             </Button>
@@ -90,21 +105,25 @@ export function ChangeModuleStatus({ module }: { module: AttentionModule }) {
         <form
           noValidate
           className="space-y-4"
-          onSubmit={handleSubmit(async ({ reason }) => {
-            if (preparing || mutation.isPending) return;
-            setPreparing(true);
-            setNotice('');
-            mutation.reset();
-            try {
-              const current = await readCurrent();
-              if (!sameModule(current, module)) setNotice(moduleError(new Error('state_changed')));
-              else setConfirmation({ module: current, reason });
-            } catch (error) {
-              setNotice(moduleError(error));
-            } finally {
-              setPreparing(false);
-            }
-          })}
+          onSubmit={(event) =>
+            void handleSubmit(async ({ reason }) => {
+              if (preparing || mutation.isPending) return;
+              requestFocus(() => summary.current ?? result.current);
+              setPreparing(true);
+              setNotice('');
+              mutation.reset();
+              try {
+                const current = await readCurrent();
+                if (!sameModule(current, module))
+                  setNotice(moduleError(new Error('state_changed')));
+                else setConfirmation({ module: current, reason });
+              } catch (error) {
+                setNotice(moduleError(error));
+              } finally {
+                setPreparing(false);
+              }
+            })(event)
+          }
         >
           <ModuleField
             id="status-reason"

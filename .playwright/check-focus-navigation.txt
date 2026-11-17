@@ -1,0 +1,64 @@
+async (page) => {
+  const assert = (value, message) => { if (!value) throw new Error(message); };
+  const focused = locator => locator.evaluate(element => document.activeElement === element);
+  const tabTo = async locator => {
+    for (let index = 0; index < 80; index++) {
+      if (await focused(locator)) return;
+      await page.keyboard.press('Tab');
+    }
+    throw new Error('Keyboard target not reachable: ' + await locator.textContent());
+  };
+  const activate = async locator => { await tabTo(locator); await page.keyboard.press('Enter'); };
+  const headingFocus = async name => {
+    await page.waitForFunction(name => document.activeElement?.textContent?.trim() === name, name);
+    const heading = page.getByRole('heading', { name, exact: true });
+    assert(await focused(heading), 'Heading is not active: ' + name);
+    assert(await heading.getAttribute('tabindex') === '-1', 'Unwanted heading Tab stop');
+    assert(await page.title() === name + ' | Heroínas y Héroes Paisanos', 'Page title mismatch');
+  };
+  await page.goto('http://localhost:5173/');
+  await headingFocus('Sesión activa');
+  await activate(page.getByRole('link', { name: 'Saltar al contenido' }));
+  assert(await page.locator('#main-content').evaluate(element => element === document.activeElement), 'Skip link');
+  await activate(page.getByRole('link', { name: 'Módulos de atención', exact: true }));
+  await headingFocus('Módulos de atención');
+  await activate(page.getByRole('link', { name: 'Ver detalle de Módulo sintético Q2B', exact: true }));
+  await headingFocus('Módulo sintético Q2B');
+  await tabTo(page.getByLabel('Motivo del cambio de estado'));
+  await page.keyboard.type('Disponibilidad sintética Q2B');
+  await activate(page.getByRole('button', { name: 'Revisar desactivación', exact: true }));
+  await page.waitForFunction(() => document.activeElement?.textContent?.trim() === 'Confirmar desactivación');
+  assert(await page.getByText('La desactivación impide nuevas asignaciones', { exact: false }).isVisible(), 'Missing consequences');
+  await page.keyboard.press('Escape');
+  assert(await focused(page.getByRole('heading', { name: 'Confirmar desactivación' })), 'Unexpected Escape behavior');
+  await activate(page.getByRole('button', { name: 'Cancelar', exact: true }));
+  assert(await focused(page.getByLabel('Motivo del cambio de estado')), 'Cancel did not return to form');
+  await activate(page.getByRole('button', { name: 'Revisar desactivación', exact: true }));
+  await page.waitForFunction(() => document.activeElement?.textContent?.trim() === 'Confirmar desactivación');
+  await activate(page.getByRole('button', { name: 'Confirmar cambio de estado', exact: true }));
+  await page.waitForFunction(() => document.activeElement?.textContent === 'Cambio de estado confirmado por el servidor.');
+  assert(await focused(page.getByRole('status')), 'Module result focus');
+  await activate(page.getByRole('link', { name: 'Inicio', exact: true }));
+  await headingFocus('Sesión activa');
+  await activate(page.getByRole('link', { name: 'Asistencias administrativas', exact: true }));
+  await headingFocus('Asistencias administrativas');
+  await activate(page.getByRole('link', { name: /Ver detalle de entrada/ }).first());
+  await headingFocus('Detalle de asistencia');
+  await tabTo(page.getByLabel('Motivo de revisión'));
+  await page.keyboard.type('Decisión sintética Q2B');
+  await activate(page.getByRole('button', { name: 'Revisar decisión', exact: true }));
+  await page.waitForFunction(() => document.activeElement?.textContent?.trim() === 'Confirmar aceptación');
+  assert(await page.getByText(/La decisión no modifica la captura ni elimina anomalías/).isVisible(), 'Missing reviewed consequences');
+  await activate(page.getByRole('button', { name: 'Volver sin aplicar', exact: true }));
+  assert(await focused(page.getByRole('combobox', { name: 'Decisión', exact: true })), 'Review cancel focus');
+  await activate(page.getByRole('button', { name: 'Revisar decisión', exact: true }));
+  await page.waitForFunction(() => document.activeElement?.textContent?.trim() === 'Confirmar aceptación');
+  await activate(page.getByRole('button', { name: 'Confirmar decisión', exact: true }));
+  await page.waitForFunction(() => document.activeElement?.textContent?.startsWith('Decisión confirmada por el servidor.'));
+  assert(await focused(page.getByRole('status')), 'Attendance result focus');
+  await activate(page.getByRole('button', { name: 'Cerrar sesión', exact: true }));
+  await headingFocus('Iniciar sesión');
+  await page.keyboard.press('Tab');
+  assert(await focused(page.getByLabel('Usuario')), 'Login return keyboard order');
+  return { keyboardNavigation: 'pass', skipLink: 'pass', moduleReviewCancelResult: 'pass', attendanceReviewCancelResult: 'pass', logout: 'pass', activeName: await page.getByLabel('Usuario').getAttribute('id') };
+}

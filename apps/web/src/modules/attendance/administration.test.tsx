@@ -101,7 +101,51 @@ async function confirm(decision = 'accept') {
   });
   fireEvent.click(screen.getByRole('button', { name: 'Revisar decisión' }));
   await screen.findByRole('button', { name: 'Confirmar decisión' });
+  expect(document.activeElement).toBe(
+    screen.getByRole('heading', {
+      name: decision === 'accept' ? 'Confirmar aceptación' : 'Confirmar rechazo',
+    }),
+  );
 }
+
+it('returns from the inline review to the decision control without applying it', async () => {
+  const fetchMock = mount(`/asistencias/${id}`);
+  await confirm();
+  expect(screen.getByText(/La decisión no modifica la captura/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Volver sin aplicar' }));
+  expect(document.activeElement).toBe(screen.getByLabelText('Decisión'));
+  expect((screen.getByLabelText('Motivo de revisión') as HTMLInputElement).value).toBe(
+    'Motivo sintético',
+  );
+  expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+});
+
+it.each([false, true])(
+  'preserves intentional focus during a delayed review result (uncertain: %s)',
+  async (uncertain) => {
+    let settle!: (response: Response) => void;
+    mount(`/asistencias/${id}`, (path, init) => {
+      if (init?.method === 'POST')
+        return new Promise<Response>((resolve) => {
+          settle = resolve;
+        });
+      return Response.json(path.includes('/history') ? page([]) : record);
+    });
+    await confirm();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar decisión' }));
+    await waitFor(() => expect(settle).toBeTypeOf('function'));
+    const logout = screen.getByRole('button', { name: 'Cerrar sesión' });
+    logout.focus();
+    settle(
+      uncertain
+        ? new Response(null, { status: 503 })
+        : Response.json({ id, version: 2, reviewStatus: 'accepted_administrative' }),
+    );
+    await screen.findByRole('button', { name: 'Consultar estado antes de otra intención' });
+    expect(document.activeElement).toBe(logout);
+    if (uncertain) expect(screen.queryByText(/Decisión confirmada por el servidor/)).toBeNull();
+  },
+);
 
 it('lists confirmed records without precise evidence and retains newly changed URL filters on return', async () => {
   const fetchMock = mount();
@@ -231,6 +275,7 @@ it.each(['accept', 'reject'])(
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar decisión' }));
     await screen.findByText(/Decisión confirmada por el servidor/);
+    expect(document.activeElement).toBe(screen.getByText(/Decisión confirmada por el servidor/));
     const posts = fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST');
     expect(posts).toHaveLength(1);
     const body = posts[0][1]?.body;
@@ -303,6 +348,7 @@ it.each([400, 403, 404, 409, 500, 'network', 'malformed'])(
               ? /El servidor rechazó los datos/
               : /Resultado incierto/;
     expect(screen.getByText(text)).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByText(text));
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
     expect(screen.queryByText(/Decisión confirmada por el servidor/)).toBeNull();
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['attendance'] });
