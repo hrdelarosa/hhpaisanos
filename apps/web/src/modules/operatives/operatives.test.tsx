@@ -48,6 +48,11 @@ afterEach(() => {
 it('lists actual names, dates and states and selects URL-based administrative context', async () => {
   mount('/operativos?status=borrador');
   await screen.findByRole('rowheader', { name: operative.name });
+  const tableRegion = screen.getByRole('region', { name: 'Tabla de operativos' });
+  expect(tableRegion.tabIndex).toBe(0);
+  expect(tableRegion.contains(screen.getByRole('table', { name: 'Operativos de Guerrero' }))).toBe(
+    true,
+  );
   expect(screen.getByText('2027-01-01')).toBeTruthy();
   expect(screen.getByText('2027-01-31')).toBeTruthy();
   fireEvent.click(screen.getByRole('link', { name: `Ver detalle de ${operative.name}` }));

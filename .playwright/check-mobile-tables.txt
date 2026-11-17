@@ -1,0 +1,85 @@
+// Run with Playwright CLI against an authenticated, isolated ADMIN fixture.
+// Each list must include an unbroken 40+ character identifier/name; accounts also need a 100+ character full name.
+async function checkMobileTables(page) {
+  const assert = (condition, message) => { if (!condition) throw new Error(message); };
+  const results = [];
+  for (const [path, name, shortCells] of [
+    ['/operativos', 'Tabla de operativos', 'thead th, tbody td'],
+    ['/cuentas', 'Tabla de cuentas', 'thead th, tbody td:nth-child(n+3)'],
+  ]) {
+    await page.goto(new URL(path, page.url()).href);
+    const table = page.getByRole('table');
+    await table.locator('tbody tr').first().waitFor();
+    const originalText = await table.innerText();
+    const identifiers = await table.getByRole('rowheader').allTextContents();
+    assert(identifiers.some(value => /\S{40}/u.test(value)), `${path}: prepare the long-content fixture`);
+    if (path === '/cuentas') assert(/\S{100}/u.test(originalText), 'Prepare a long full name');
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      const metrics = await table.evaluate((table, selector) => {
+        const fragmented = [...table.querySelectorAll(selector)].filter(el => {
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          const rects = [];
+          while (walker.nextNode()) {
+            if (!walker.currentNode.textContent.trim()) continue;
+            const range = document.createRange();
+            range.selectNodeContents(walker.currentNode);
+            rects.push(...range.getClientRects());
+          }
+          return rects.length && Math.max(...rects.map(r => r.bottom)) - Math.min(...rects.map(r => r.top)) > parseFloat(getComputedStyle(el).lineHeight) + 1;
+        }).map(el => el.textContent.trim());
+        const longCells = [...table.querySelectorAll('tbody th, tbody td:nth-child(2)')].filter(el => /\S{40}/u.test(el.textContent));
+        const wrapped = longCells.every(el => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          return range.getBoundingClientRect().height > parseFloat(getComputedStyle(el).lineHeight) && el.scrollWidth <= el.clientWidth + 1;
+        });
+        return { document: document.documentElement.scrollWidth, fragmented, table: table.getBoundingClientRect().width, wrapped };
+      }, shortCells);
+      assert(metrics.document <= width + 1, `${path}: document overflows at ${width}px`);
+      assert(!metrics.fragmented.length, `${path}: fragmented short text at ${width}px: ${metrics.fragmented.join(', ')}`);
+      assert(metrics.wrapped, `${path}: long names must wrap within their cells`);
+      const region = page.getByRole('region', { name, exact: true });
+      assert(await region.getAttribute('tabindex') === '0', `${path}: scroll region must be keyboard reachable`);
+      await region.evaluate(el => { el.scrollLeft = 0; });
+      await region.focus();
+      const focused = await region.evaluate(el => ({ focused: document.activeElement === el, outline: getComputedStyle(el).outlineWidth }));
+      assert(focused.focused && parseFloat(focused.outline) >= 2, `${path}: missing visible scroll-region focus`);
+      await page.keyboard.press('ArrowRight');
+      await page.waitForFunction(name => document.querySelector(`[aria-label="${name}"]`).scrollLeft > 0, name);
+      const keyboardScroll = await region.evaluate(el => el.scrollLeft);
+      const nativeScroll = await region.evaluate(el => ({ overflow: getComputedStyle(el).overflowX, touch: getComputedStyle(el).touchAction }));
+      assert(nativeScroll.overflow === 'auto' && nativeScroll.touch === 'auto', `${path}: native panning is disabled`);
+      const link = table.getByRole('link').first();
+      await page.keyboard.press('Tab');
+      assert(await link.evaluate(el => document.activeElement === el), `${path}: Tab did not reach the first action`);
+      const actionVisible = await link.evaluate(el => {
+        const box = el.getBoundingClientRect(), parent = el.closest('section[aria-label]').getBoundingClientRect();
+        return box.left >= parent.left + 4 && box.right <= parent.right - 4 && parseFloat(getComputedStyle(el).outlineWidth) >= 2;
+      });
+      assert(actionVisible, `${path}: action or its focus indicator is clipped`);
+      assert(await table.innerText() === originalText, `${path}: content changed during scrolling`);
+      assert(await table.locator('thead th:not([scope="col"]), tbody th:not([scope="row"])').count() === 0, `${path}: missing header scope`);
+      await region.evaluate(el => { el.scrollLeft = 0; el.scrollIntoView({ block: 'start' }); });
+      const box = await region.boundingBox();
+      const touch = await page.context().newCDPSession(page);
+      let touchScroll;
+      try {
+        await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+        const x = box.x + box.width - 24, y = Math.max(24, box.y) + 24;
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+        for (let step = 1; step <= 4; step++) {
+          await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - step * 40, y }] });
+        }
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await page.waitForFunction(name => document.querySelector(`[aria-label="${name}"]`).scrollLeft > 0, name);
+        touchScroll = await region.evaluate(el => el.scrollLeft);
+      } finally {
+        await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+        await touch.detach();
+      }
+      results.push({ path, width, ...metrics, keyboardScroll, touchScroll, actionVisible });
+    }
+  }
+  return results;
+}
