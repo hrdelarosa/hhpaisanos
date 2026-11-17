@@ -6,17 +6,30 @@ export function SessionStatus() {
   const session = useSession();
   if (session.status === 'loading')
     return (
-      <AuthFrame>
-        <output>Verificando sesión…</output>
+      <AuthFrame variant="authentication">
+        <header className="space-y-2">
+          <p className="text-caption font-medium tracking-wide text-muted-foreground">
+            Acceso institucional
+          </p>
+          <h1 className="text-heading">Verificando sesión</h1>
+          <output aria-live="polite" className="text-body-sm text-foreground-secondary">
+            Verificando sesión…
+          </output>
+        </header>
       </AuthFrame>
     );
   return (
-    <AuthFrame>
-      <h1 className="text-heading">
-        {session.status === 'logoutFailed'
-          ? 'Cierre de sesión sin confirmar'
-          : 'No se pudo verificar la sesión'}
-      </h1>
+    <AuthFrame variant="authentication">
+      <header className="space-y-2">
+        <p className="text-caption font-medium tracking-wide text-muted-foreground">
+          Acceso institucional
+        </p>
+        <h1 className="text-heading">
+          {session.status === 'logoutFailed'
+            ? 'Cierre de sesión sin confirmar'
+            : 'No se pudo verificar la sesión'}
+        </h1>
+      </header>
       <p role="alert" className="rounded-md bg-warning-surface p-4 text-warning">
         {session.status === 'logoutFailed'
           ? session.notice

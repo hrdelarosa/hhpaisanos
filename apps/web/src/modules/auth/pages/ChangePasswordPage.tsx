@@ -16,14 +16,19 @@ export function ChangePasswordPage() {
     formState: { errors },
   } = useForm<PasswordInput>({ resolver: zodResolver(passwordSchema) });
   return (
-    <AuthFrame>
-      <h1 className="text-heading">Cambiar contraseña</h1>
-      <p className="text-body-sm text-foreground-secondary">
-        {session.user?.mustChangePassword
-          ? 'Debes cambiar tu contraseña antes de continuar.'
-          : 'Actualiza tu contraseña.'}{' '}
-        Al cambiarla se cerrarán todas tus sesiones y tendrás que iniciar sesión de nuevo.
-      </p>
+    <AuthFrame variant="authentication">
+      <header className="space-y-2">
+        <p className="text-caption font-medium tracking-wide text-muted-foreground">
+          Acceso institucional
+        </p>
+        <h1 className="text-heading">Cambiar contraseña</h1>
+        <p className="text-body-sm text-foreground-secondary">
+          {session.user?.mustChangePassword
+            ? 'Debes cambiar tu contraseña antes de continuar.'
+            : 'Actualiza tu contraseña.'}{' '}
+          Al cambiarla se cerrarán todas tus sesiones y tendrás que iniciar sesión de nuevo.
+        </p>
+      </header>
       {session.actionError && (
         <p role="alert" className="text-destructive">
           {session.actionError}

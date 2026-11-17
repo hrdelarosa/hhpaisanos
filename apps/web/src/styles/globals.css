@@ -152,8 +152,8 @@
   }
 }
 
-/* Native navigation dialogs retain their closed display state and modal behavior. */
-.app-sidebar[hidden] {
+/* Native shadcn-style sidebar dialog keeps the browser's modal focus behavior. */
+.sidebar-desktop[hidden] {
   display: none;
 }
 
@@ -161,13 +161,6 @@
   overscroll-behavior: contain;
 }
 
-.mobile-navigation::backdrop {
-  background: var(--foreground);
-  opacity: 0.45;
-  overflow: hidden;
-  overscroll-behavior: contain;
-}
-
-:is(.app-sidebar, .mobile-navigation) a:not([aria-current]):focus-visible {
+:is(.sidebar-desktop, .mobile-navigation) .sidebar-menu-button:focus-visible {
   outline-color: var(--focus-inverse);
 }

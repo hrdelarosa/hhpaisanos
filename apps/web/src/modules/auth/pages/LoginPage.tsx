@@ -20,7 +20,7 @@ export function LoginPage() {
     return <Navigate to={session.user?.mustChangePassword ? '/cambiar-contrasena' : '/'} replace />;
   if (session.status !== 'anonymous') return <SessionStatus />;
   return (
-    <AuthFrame variant="login">
+    <AuthFrame variant="authentication">
       <header className="space-y-2">
         <p className="text-caption font-medium tracking-wide text-muted-foreground">
           Acceso institucional
