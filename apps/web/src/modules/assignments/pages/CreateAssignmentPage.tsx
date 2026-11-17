@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
 import { Button } from '../../../components/ui/button';
+import { useInvalidFieldFocus } from '../../../hooks/use-invalid-field-focus';
 import { HttpError } from '../../../lib/http';
 import { useSession } from '../../auth/hooks/use-session';
 import { assignmentsKey, createAssignment } from '../api/assignments';
@@ -14,6 +15,8 @@ import { assignmentError } from '../utils/feedback';
 import { readResources, sameSnapshot } from '../utils/preflight';
 
 export function CreateAssignmentPage() {
+  const id = useId();
+  const { formRef, prepareInvalidFocus } = useInvalidFieldFocus();
   const { user } = useSession();
   const client = useQueryClient();
   const lock = useRef(false);
@@ -32,6 +35,7 @@ export function CreateAssignmentPage() {
     formState: { errors },
   } = useForm<CreateAssignment>({
     resolver: zodResolver(createAssignmentSchema),
+    shouldFocusError: false,
     defaultValues: {
       operativeId: '',
       observerId: '',
@@ -144,6 +148,7 @@ export function CreateAssignmentPage() {
         </section>
       ) : (
         <form
+          ref={formRef}
           noValidate
           className="space-y-4"
           onSubmit={(event) =>
@@ -160,7 +165,7 @@ export function CreateAssignmentPage() {
                 lock.current = false;
                 setBusy(false);
               }
-            })(event)
+            }, prepareInvalidFocus())(event)
           }
         >
           {(
@@ -189,7 +194,7 @@ export function CreateAssignmentPage() {
           ).map(([field, label, type]) => (
             <AssignmentField
               key={field}
-              id={field}
+              id={`${id}-${field}`}
               label={label}
               type={type}
               step={type === 'time' ? 1 : undefined}

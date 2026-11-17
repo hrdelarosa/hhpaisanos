@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
+import { fieldErrorAttributes } from '../../../lib/field-error';
 import { useSession } from '../../auth/hooks/use-session';
 import { listObservers, observerQuery, observersKey } from '../../observers/api/observers';
 import { listOperatives, operativeQuery, operativesKey } from '../../operatives/api/operatives';
@@ -52,13 +53,18 @@ export function ResourcePicker({
   onChange,
   disabled,
   error,
+  'aria-describedby': description,
 }: {
   kind: ResourceKind;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   error?: string;
+  'aria-describedby'?: string;
 }) {
+  const id = useId();
+  const errorId = `${id}-error`;
+  const searchErrorId = `${id}-search-error`;
   const { user } = useSession();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -104,6 +110,13 @@ export function ResourcePicker({
     enabled: allowed && Array.from(search).length <= 100,
   });
   const label = resources[kind].label;
+  const searchError =
+    Array.from(search).length > 100 ? 'Máximo 100 caracteres de búsqueda.' : undefined;
+  const selectionAvailable = !searchError && query.isSuccess;
+  const searchDescription =
+    [description, searchError && !selectionAvailable && error ? errorId : undefined]
+      .filter(Boolean)
+      .join(' ') || undefined;
   return (
     <fieldset disabled={disabled} className="min-w-0 space-y-2 rounded-md border p-4">
       <legend>{label}</legend>
@@ -116,17 +129,22 @@ export function ResourcePicker({
               Selección: <ResourceName kind={kind} id={value} />
             </p>
           )}
-          <label htmlFor={`${kind}-search`}>Buscar {label.toLowerCase()}</label>
+          <label htmlFor={`${id}-search`}>Buscar {label.toLowerCase()}</label>
           <Input
-            id={`${kind}-search`}
+            id={`${id}-search`}
+            {...fieldErrorAttributes(
+              searchError ? searchErrorId : errorId,
+              searchError ?? (!selectionAvailable ? error : undefined),
+              searchDescription,
+            )}
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setPage(1);
             }}
           />
-          {Array.from(search).length > 100 ? (
-            <p role="alert">Máximo 100 caracteres de búsqueda.</p>
+          {searchError ? (
+            <p id={searchErrorId}>{searchError}</p>
           ) : query.isPending ? (
             <output>Cargando opciones.</output>
           ) : query.isError ? (
@@ -138,16 +156,15 @@ export function ResourcePicker({
             </div>
           ) : (
             <>
-              <label htmlFor={`${kind}-selection`}>
+              <label htmlFor={`${id}-selection`}>
                 Seleccionar {label.toLowerCase()} (página {page})
               </label>
               <select
-                id={`${kind}-selection`}
+                id={`${id}-selection`}
                 className="min-h-touch w-full min-w-0 rounded-md border border-input bg-card px-3"
                 value={query.data.items.some((v) => v.id === value) ? value : ''}
                 onChange={(e) => onChange(e.target.value)}
-                aria-invalid={Boolean(error)}
-                aria-describedby={error ? `${kind}-error` : undefined}
+                {...fieldErrorAttributes(errorId, error, description)}
               >
                 <option value="">Selecciona una opción</option>
                 {query.data.items.map((v) => (
@@ -180,11 +197,7 @@ export function ResourcePicker({
           )}
         </>
       )}
-      {error && (
-        <p id={`${kind}-error`} role="alert">
-          {error}
-        </p>
-      )}
+      {error && <p id={errorId}>{error}</p>}
     </fieldset>
   );
 }
