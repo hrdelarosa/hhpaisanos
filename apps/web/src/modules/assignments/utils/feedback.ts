@@ -33,3 +33,9 @@ export function assignmentStatus(assignment: Assignment) {
   if (assignment.validTo < today) return 'Finalizada por vigencia';
   return assignment.validFrom > today ? 'Programada' : 'Vigente por fechas';
 }
+
+export function assignmentStatusTone(status: string): 'success' | 'info' | 'neutral' {
+  if (status === 'Vigente por fechas') return 'success';
+  if (status === 'Programada') return 'info';
+  return 'neutral';
+}

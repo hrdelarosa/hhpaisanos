@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vite-plus/test';
 import { QueryClient } from '@tanstack/react-query';
 import { App } from '../../app/App';
 import { assignmentSchema, createAssignmentSchema, filterSchema } from './schemas/assignments';
-import { assignmentStatus } from './utils/feedback';
+import { assignmentStatus, assignmentStatusTone } from './utils/feedback';
 
 const id = '019a7fb0-0000-7000-8000-000000000001';
 const observerId = '019a7fb0-0000-7000-8000-000000000002';
@@ -251,12 +251,18 @@ it.each([
   );
 });
 it('distinguishes scheduled, elapsed and cancelled periods without inventing a server status', () => {
-  expect(assignmentStatus({ ...assignment, validTo: '2026-01-02' })).toBe(
-    'Finalizada por vigencia',
-  );
-  expect(assignmentStatus({ ...assignment, validFrom: '2099-01-01' })).toBe('Programada');
-  expect(assignmentStatus({ ...assignment, cancelledAt: timestamp })).toBe('Cancelada');
-  expect(assignmentStatus(assignment)).toBe('Vigente por fechas');
+  const elapsed = assignmentStatus({ ...assignment, validTo: '2026-01-02' });
+  const scheduled = assignmentStatus({ ...assignment, validFrom: '2099-01-01' });
+  const cancelled = assignmentStatus({ ...assignment, cancelledAt: timestamp });
+  const current = assignmentStatus(assignment);
+  expect(elapsed).toBe('Finalizada por vigencia');
+  expect(scheduled).toBe('Programada');
+  expect(cancelled).toBe('Cancelada');
+  expect(current).toBe('Vigente por fechas');
+  expect(assignmentStatusTone(elapsed)).toBe('neutral');
+  expect(assignmentStatusTone(scheduled)).toBe('info');
+  expect(assignmentStatusTone(cancelled)).toBe('neutral');
+  expect(assignmentStatusTone(current)).toBe('success');
 });
 it.each(['list', 'detail'])('shows %s loading, error and manual read retry', async (view) => {
   let resolve!: (response: Response) => void;

@@ -129,7 +129,10 @@ export function ReviewAttendance({ record }: { record: AdministrativeDetail }) {
           Solo se pueden revisar registros vigentes pendientes. Este registro no admite revisión.
         </p>
       ) : confirmation ? (
-        <section aria-label="Confirmación de revisión" className="space-y-4">
+        <section
+          aria-label="Confirmación de revisión"
+          className="space-y-4 rounded-md border bg-muted p-4"
+        >
           <h3 ref={summary} tabIndex={-1} className="text-subheading">
             Confirmar {confirmation.input.decision === 'accept' ? 'aceptación' : 'rechazo'}
           </h3>
@@ -170,7 +173,7 @@ export function ReviewAttendance({ record }: { record: AdministrativeDetail }) {
       ) : (
         <form
           noValidate
-          className="space-y-4"
+          className="space-y-6"
           onSubmit={(event) =>
             void handleSubmit(async (input) => {
               if (lock.current) return;
@@ -191,7 +194,9 @@ export function ReviewAttendance({ record }: { record: AdministrativeDetail }) {
             })(event)
           }
         >
-          <p>Registro vigente · versión {record.version} · pendiente de revisión.</p>
+          <p className="rounded-md bg-warning-surface p-3 text-body-sm text-warning">
+            Registro vigente · versión {record.version} · pendiente de revisión.
+          </p>
           <label className="block space-y-2" htmlFor="review-decision">
             Decisión
             <select
@@ -219,9 +224,11 @@ export function ReviewAttendance({ record }: { record: AdministrativeDetail }) {
               {errors.reason.message}
             </p>
           )}
-          <Button type="submit" disabled={busy}>
-            Revisar decisión
-          </Button>
+          <div className="flex justify-end border-t pt-4">
+            <Button type="submit" disabled={busy}>
+              Revisar decisión
+            </Button>
+          </div>
         </form>
       )}
     </section>

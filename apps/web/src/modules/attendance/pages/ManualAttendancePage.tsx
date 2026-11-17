@@ -5,6 +5,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
+import { PageHeader } from '../../../components/page-header';
 import { useInvalidFieldFocus } from '../../../hooks/use-invalid-field-focus';
 import { fieldErrorAttributes } from '../../../lib/field-error';
 import { useSession } from '../../auth/hooks/use-session';
@@ -180,19 +181,21 @@ export function ManualAttendancePage() {
       </p>
     );
   return (
-    <div className="max-w-form space-y-4">
+    <div className="max-w-form space-y-6">
       <Link
         className="inline-flex min-h-touch items-center text-primary underline"
         to="/asistencias"
       >
         Volver a asistencias
       </Link>
-      <h1 className="text-heading">Captura manual de asistencia</h1>
-      <p>
-        Registro administrativo, no captura del observador. No solicita ni fabrica GPS. La API
-        valida que la hora no sea futura y pertenezca a la fecha civil en America/Mexico_City, al
-        periodo histórico y al orden entrada/salida. Puede completarse primero cualquiera de las dos
-        marcas.
+      <PageHeader
+        title="Captura manual de asistencia"
+        description="Registro administrativo, no captura del observador. No solicita ni fabrica GPS."
+      />
+      <p className="text-body-sm text-muted-foreground">
+        La API valida que la hora no sea futura y pertenezca a la fecha civil en
+        America/Mexico_City, al periodo histórico y al orden entrada/salida. Puede completarse
+        primero cualquiera de las dos marcas.
       </p>
       {notice && <p role={mutation.isSuccess ? 'status' : 'alert'}>{notice}</p>}
       {resultId && (
@@ -211,7 +214,7 @@ export function ManualAttendancePage() {
       ) : confirmation ? (
         <section
           aria-label="Confirmación de captura manual"
-          className="space-y-4 rounded-lg border bg-card p-4 sm:p-6"
+          className="space-y-4 rounded-lg border bg-muted p-4 sm:p-6"
         >
           <h2 className="text-heading-sm">Confirmar captura manual</h2>
           <p className="break-all">
@@ -251,7 +254,7 @@ export function ManualAttendancePage() {
         <form
           ref={formRef}
           noValidate
-          className="space-y-4"
+          className="space-y-6 rounded-lg border bg-card p-4 sm:p-6"
           onSubmit={(event) =>
             void handleSubmit(async (input) => {
               if (lock.current) return;
@@ -270,144 +273,150 @@ export function ManualAttendancePage() {
             }, prepareInvalidFocus())(event)
           }
         >
-          <ResourcePicker
-            kind="observer"
-            error={errors.observerId?.message}
-            value={observerId}
-            disabled={busy}
-            onChange={(id) => {
-              setValue('observerId', id, { shouldValidate: true });
-              setValue('assignmentId', '');
-              setPage(1);
-            }}
-          />
-          <ResourcePicker
-            kind="operative"
-            error={!historicalSelectionAvailable ? errors.assignmentId?.message : undefined}
-            value={operativeId}
-            disabled={busy}
-            onChange={(id) => {
-              setOperativeId(id);
-              setValue('assignmentId', '');
-              setPage(1);
-            }}
-          />
-          {observerId &&
-            operativeId &&
-            (periods.isPending ? (
-              <output>Cargando asignaciones históricas.</output>
-            ) : periods.isError ? (
-              <div role="alert">
-                <p>No se pudieron consultar asignaciones.</p>
-                <Button type="button" variant="secondary" onClick={() => void periods.refetch()}>
-                  Reintentar asignaciones
-                </Button>
-              </div>
-            ) : (
-              <fieldset disabled={busy} className="space-y-2">
-                {assignmentId && (
-                  <p className="break-all">Asignación seleccionada: {assignmentId}</p>
-                )}
-                <label className="block">
-                  Asignación histórica
-                  <select
-                    {...errorAttributes('assignmentId')}
-                    className="min-h-touch w-full min-w-0 rounded-md border border-input bg-card px-3"
-                    {...register('assignmentId')}
-                  >
-                    <option value="">Selecciona una asignación</option>
-                    {periods.data.items.map((v) => (
-                      <option key={v.id} value={v.id} disabled={v.cancelledAt !== null}>
-                        {v.validFrom} — {v.validTo} · {v.startTime} — {v.endTime} · {v.id}
-                        {v.cancelledAt ? ' · Cancelada' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {!periods.data.items.length && <p>No hay asignaciones en esta página.</p>}
-                <div className="flex flex-wrap gap-4">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={page === 1}
-                    onClick={() => {
-                      setValue('assignmentId', '');
-                      setPage(page - 1);
-                    }}
-                  >
-                    Asignaciones anteriores
-                  </Button>
-                  <span>Página {page}</span>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={page * 20 >= periods.data.total}
-                    onClick={() => {
-                      setValue('assignmentId', '');
-                      setPage(page + 1);
-                    }}
-                  >
-                    Más asignaciones
+          <fieldset className="space-y-4">
+            <legend className="mb-4 text-subheading">Personas y asignación histórica</legend>
+            <ResourcePicker
+              kind="observer"
+              error={errors.observerId?.message}
+              value={observerId}
+              disabled={busy}
+              onChange={(id) => {
+                setValue('observerId', id, { shouldValidate: true });
+                setValue('assignmentId', '');
+                setPage(1);
+              }}
+            />
+            <ResourcePicker
+              kind="operative"
+              error={!historicalSelectionAvailable ? errors.assignmentId?.message : undefined}
+              value={operativeId}
+              disabled={busy}
+              onChange={(id) => {
+                setOperativeId(id);
+                setValue('assignmentId', '');
+                setPage(1);
+              }}
+            />
+            {observerId &&
+              operativeId &&
+              (periods.isPending ? (
+                <output>Cargando asignaciones históricas.</output>
+              ) : periods.isError ? (
+                <div role="alert">
+                  <p>No se pudieron consultar asignaciones.</p>
+                  <Button type="button" variant="secondary" onClick={() => void periods.refetch()}>
+                    Reintentar asignaciones
                   </Button>
                 </div>
-              </fieldset>
-            ))}
-          <label className="block space-y-2" htmlFor={`${id}-date`}>
-            Fecha civil de asistencia
-            <Input
-              id={`${id}-date`}
-              type="date"
-              disabled={busy}
-              {...errorAttributes('date')}
-              {...register('date')}
-            />
-          </label>
-          <label className="block space-y-2">
-            Tipo de marca
-            <select
-              {...errorAttributes('type')}
-              className="min-h-touch w-full rounded-md border border-input bg-card px-3"
-              disabled={busy}
-              {...register('type')}
-            >
-              <option value="entrada">Entrada</option>
-              <option value="salida">Salida</option>
-            </select>
-          </label>
-          <label className="block space-y-2" htmlFor={`${id}-timestamp`}>
-            Hora oficial UTC (YYYY-MM-DDTHH:mm:ss.ffffffZ)
-            <Input
-              id={`${id}-timestamp`}
-              disabled={busy}
-              {...errorAttributes('officialTimestamp')}
-              {...register('officialTimestamp')}
-            />
-          </label>
-          <label className="block space-y-2">
-            Motivo de falta de ubicación
-            <select
-              {...errorAttributes('missingLocationReason')}
-              className="min-h-touch w-full rounded-md border border-input bg-card px-3"
-              disabled={busy}
-              {...register('missingLocationReason')}
-            >
-              <option value="">Selecciona el motivo real</option>
-              {Object.entries(missingLocationLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
+              ) : (
+                <fieldset disabled={busy} className="space-y-2">
+                  {assignmentId && (
+                    <p className="break-all">Asignación seleccionada: {assignmentId}</p>
+                  )}
+                  <label className="block">
+                    Asignación histórica
+                    <select
+                      {...errorAttributes('assignmentId')}
+                      className="min-h-touch w-full min-w-0 rounded-md border border-input bg-card px-3"
+                      {...register('assignmentId')}
+                    >
+                      <option value="">Selecciona una asignación</option>
+                      {periods.data.items.map((v) => (
+                        <option key={v.id} value={v.id} disabled={v.cancelledAt !== null}>
+                          {v.validFrom} — {v.validTo} · {v.startTime} — {v.endTime} · {v.id}
+                          {v.cancelledAt ? ' · Cancelada' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {!periods.data.items.length && <p>No hay asignaciones en esta página.</p>}
+                  <div className="flex flex-wrap gap-4">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={page === 1}
+                      onClick={() => {
+                        setValue('assignmentId', '');
+                        setPage(page - 1);
+                      }}
+                    >
+                      Asignaciones anteriores
+                    </Button>
+                    <span>Página {page}</span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={page * 20 >= periods.data.total}
+                      onClick={() => {
+                        setValue('assignmentId', '');
+                        setPage(page + 1);
+                      }}
+                    >
+                      Más asignaciones
+                    </Button>
+                  </div>
+                </fieldset>
               ))}
-            </select>
-          </label>
-          <label className="block space-y-2" htmlFor={`${id}-reason`}>
-            Motivo administrativo de captura
-            <Input
-              id={`${id}-reason`}
-              disabled={busy}
-              {...errorAttributes('reason')}
-              {...register('reason')}
-            />
-          </label>
+          </fieldset>
+          <fieldset className="grid gap-4 border-t pt-4 sm:grid-cols-2">
+            <legend className="mb-4 text-subheading">Datos de la marca y motivo</legend>
+            <label className="block space-y-2" htmlFor={`${id}-date`}>
+              Fecha civil de asistencia
+              <Input
+                id={`${id}-date`}
+                type="date"
+                disabled={busy}
+                {...errorAttributes('date')}
+                {...register('date')}
+              />
+            </label>
+            <label className="block space-y-2">
+              Tipo de marca
+              <select
+                {...errorAttributes('type')}
+                className="min-h-touch w-full rounded-md border border-input bg-card px-3"
+                disabled={busy}
+                {...register('type')}
+              >
+                <option value="entrada">Entrada</option>
+                <option value="salida">Salida</option>
+              </select>
+            </label>
+            <label className="block space-y-2" htmlFor={`${id}-timestamp`}>
+              Hora oficial UTC (YYYY-MM-DDTHH:mm:ss.ffffffZ)
+              <Input
+                id={`${id}-timestamp`}
+                disabled={busy}
+                {...errorAttributes('officialTimestamp')}
+                {...register('officialTimestamp')}
+              />
+            </label>
+            <label className="block space-y-2">
+              Motivo de falta de ubicación
+              <select
+                {...errorAttributes('missingLocationReason')}
+                className="min-h-touch w-full rounded-md border border-input bg-card px-3"
+                disabled={busy}
+                {...register('missingLocationReason')}
+              >
+                <option value="">Selecciona el motivo real</option>
+                {Object.entries(missingLocationLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block space-y-2" htmlFor={`${id}-reason`}>
+              Motivo administrativo de captura
+              <Input
+                id={`${id}-reason`}
+                disabled={busy}
+                {...errorAttributes('reason')}
+                {...register('reason')}
+              />
+            </label>
+          </fieldset>
           {Object.entries(errors)
             .filter(
               ([key]) =>

@@ -4,6 +4,8 @@ const tones = {
   success: 'bg-success-surface text-success',
   neutral: 'bg-muted text-foreground-secondary',
   warning: 'bg-warning-surface text-warning',
+  danger: 'bg-danger-surface text-destructive',
+  info: 'bg-info-surface text-info',
 };
 
 export function StatusBadge({ label, tone }: { label: string; tone: keyof typeof tones }) {

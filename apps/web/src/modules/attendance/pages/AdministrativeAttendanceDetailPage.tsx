@@ -13,6 +13,8 @@ import { ReviewAttendance } from '../components/ReviewAttendance';
 import { HistoricalAttendanceOperation } from '../components/HistoricalAttendanceOperation';
 import { reviewLabels } from '../components/AttendanceDayCard';
 import { administrativeAttendanceError } from '../utils/administration';
+import { PageHeader } from '../../../components/page-header';
+import { PaginationPage } from '../../../components/pagination-page';
 
 const eventLabels: Record<string, string> = {
   'attendance.captured': 'Captura original',
@@ -49,7 +51,10 @@ export function AdministrativeAttendanceDetailPage() {
       >
         Volver a asistencias
       </Link>
-      <h1 className="text-heading">Detalle de asistencia</h1>
+      <PageHeader
+        title="Detalle de asistencia"
+        description="Captura, revisión y versiones históricas se presentan como evidencia independiente."
+      />
       {!valid ? (
         <p role="alert">Identificador inválido.</p>
       ) : detail.isPending ? (
@@ -64,7 +69,7 @@ export function AdministrativeAttendanceDetailPage() {
       ) : (
         <>
           <AdministrativeMarkCard mark={detail.data} />
-          <section className="space-y-2 rounded-lg border bg-card p-4 sm:p-6">
+          <section className="space-y-4 rounded-lg border bg-card p-4 sm:p-6">
             <h2 className="text-heading-sm">Captura original y versión consultada</h2>
             <p className="break-all">Registro: {detail.data.id}</p>
             <p className="break-words">
@@ -90,7 +95,7 @@ export function AdministrativeAttendanceDetailPage() {
               </p>
             )}
           </section>
-          <section className="space-y-2 rounded-lg border bg-card p-4 sm:p-6">
+          <section className="space-y-4 rounded-lg border bg-card p-4 sm:p-6">
             <h2 className="text-heading-sm">Evidencia de ubicación no verificada</h2>
             <p>Esta evidencia no prueba presencia física.</p>
             {detail.data.locationEvidence.status === 'missing' ? (
@@ -112,7 +117,7 @@ export function AdministrativeAttendanceDetailPage() {
               </dl>
             )}
           </section>
-          <section className="space-y-2 rounded-lg border bg-card p-4 sm:p-6">
+          <section className="space-y-4 rounded-lg border bg-card p-4 sm:p-6">
             <h2 className="text-heading-sm">Decisión administrativa expuesta</h2>
             {detail.data.decision.actorId === null &&
             detail.data.decision.timestamp === null &&
@@ -167,9 +172,12 @@ export function AdministrativeAttendanceDetailPage() {
                 {!history.data.items.length ? (
                   <p>No hay versiones en esta página.</p>
                 ) : (
-                  <ol className="space-y-4">
+                  <ol className="relative space-y-4 border-s-2 border-border ps-4 sm:ps-6">
                     {history.data.items.map((version) => (
-                      <li key={version.id} className="min-w-0 space-y-2">
+                      <li
+                        key={version.id}
+                        className="min-w-0 space-y-3 rounded-lg border bg-card p-4 sm:p-6"
+                      >
                         <h3 className="text-subheading">
                           Versión {version.version}
                           {version.version === 1 ? ' · Captura original' : ' · Versión posterior'}
@@ -184,9 +192,9 @@ export function AdministrativeAttendanceDetailPage() {
                         {!version.events.length ? (
                           <p>Sin eventos expuestos para esta versión.</p>
                         ) : (
-                          <ul className="space-y-2">
+                          <ul className="grid gap-2 sm:grid-cols-2">
                             {version.events.map((event, index) => (
-                              <li key={index} className="space-y-2 rounded-md bg-muted p-4">
+                              <li key={index} className="min-w-0 space-y-2 rounded-md bg-muted p-4">
                                 <p>
                                   {eventLabels[event.action] ?? event.action} · {event.timestamp}
                                 </p>
@@ -212,28 +220,16 @@ export function AdministrativeAttendanceDetailPage() {
                     ))}
                   </ol>
                 )}
-                <nav
-                  aria-label="Paginación de versiones"
-                  className="flex flex-wrap items-center gap-4"
-                >
-                  <Button
-                    variant="secondary"
-                    disabled={historyPage <= 1}
-                    onClick={() => void setHistoryPage(historyPage - 1)}
-                  >
-                    Versiones anteriores
-                  </Button>
-                  <p>
-                    Página {history.data.page} · {history.data.total} versiones
-                  </p>
-                  <Button
-                    variant="secondary"
-                    disabled={historyPage * history.data.limit >= history.data.total}
-                    onClick={() => void setHistoryPage(historyPage + 1)}
-                  >
-                    Versiones siguientes
-                  </Button>
-                </nav>
+                <PaginationPage
+                  label="Paginación de versiones"
+                  page={history.data.page}
+                  total={history.data.total}
+                  limit={history.data.limit}
+                  previousDisabled={historyPage <= 1}
+                  nextDisabled={historyPage * history.data.limit >= history.data.total}
+                  onPreviousClick={() => void setHistoryPage(historyPage - 1)}
+                  onNextClick={() => void setHistoryPage(historyPage + 1)}
+                />
               </>
             )}
           </section>

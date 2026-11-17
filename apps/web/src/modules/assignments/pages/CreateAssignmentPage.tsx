@@ -4,6 +4,7 @@ import { useId, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
 import { Button } from '../../../components/ui/button';
+import { PageHeader } from '../../../components/page-header';
 import { useInvalidFieldFocus } from '../../../hooks/use-invalid-field-focus';
 import { HttpError } from '../../../lib/http';
 import { useSession } from '../../auth/hooks/use-session';
@@ -87,12 +88,11 @@ export function CreateAssignmentPage() {
       </p>
     );
   return (
-    <section className="max-w-form space-y-4">
-      <h1 className="text-heading">Crear asignación</h1>
-      <p>
-        Selecciona recursos activos y un operativo borrador o activo. No se requiere cuenta
-        vinculada para planificar; la captura de asistencia tiene requisitos adicionales.
-      </p>
+    <section className="max-w-form space-y-6">
+      <PageHeader
+        title="Crear asignación"
+        description="Selecciona recursos activos y un operativo borrador o activo. No se requiere cuenta vinculada para planificar; la captura de asistencia tiene requisitos adicionales."
+      />
       {notice && <p role={mutation.isSuccess ? 'status' : 'alert'}>{notice}</p>}
       {blocked ? (
         <div className="space-y-4">
@@ -112,7 +112,7 @@ export function CreateAssignmentPage() {
       ) : confirmation ? (
         <section
           aria-label="Confirmación de creación"
-          className="space-y-4 rounded-lg border bg-card p-4"
+          className="space-y-4 rounded-lg border bg-muted p-4 sm:p-6"
         >
           <h2 className="text-heading-sm">Confirmar creación</h2>
           <p>
@@ -150,7 +150,7 @@ export function CreateAssignmentPage() {
         <form
           ref={formRef}
           noValidate
-          className="space-y-4"
+          className="space-y-6 rounded-lg border bg-card p-4 sm:p-6"
           onSubmit={(event) =>
             void handleSubmit(async (input) => {
               if (lock.current) return;
@@ -168,47 +168,55 @@ export function CreateAssignmentPage() {
             }, prepareInvalidFocus())(event)
           }
         >
-          {(
-            [
-              ['observer', 'observerId'],
-              ['operative', 'operativeId'],
-              ['module', 'attentionModuleId'],
-            ] as const
-          ).map(([kind, field]) => (
-            <ResourcePicker
-              key={kind}
-              kind={kind}
-              value={values[field] ?? ''}
-              disabled={busy}
-              onChange={(value) => setValue(field, value, { shouldValidate: true })}
-              error={errors[field]?.message}
-            />
-          ))}
-          {(
-            [
-              ['validFrom', 'Inicio de vigencia', 'date'],
-              ['validTo', 'Fin de vigencia', 'date'],
-              ['startTime', 'Hora de entrada', 'time'],
-              ['endTime', 'Hora de salida', 'time'],
-            ] as const
-          ).map(([field, label, type]) => (
-            <AssignmentField
-              key={field}
-              id={`${id}-${field}`}
-              label={label}
-              type={type}
-              step={type === 'time' ? 1 : undefined}
-              disabled={busy}
-              error={errors[field]?.message}
-              {...register(field, {
-                setValueAs: (value: string) =>
-                  type === 'time' && value.length === 5 ? `${value}:00` : value,
-              })}
-            />
-          ))}
-          <Button type="submit" disabled={busy}>
-            Revisar creación
-          </Button>
+          <fieldset className="space-y-4">
+            <legend className="mb-4 text-subheading">Recursos asignados</legend>
+            {(
+              [
+                ['observer', 'observerId'],
+                ['operative', 'operativeId'],
+                ['module', 'attentionModuleId'],
+              ] as const
+            ).map(([kind, field]) => (
+              <ResourcePicker
+                key={kind}
+                kind={kind}
+                value={values[field] ?? ''}
+                disabled={busy}
+                onChange={(value) => setValue(field, value, { shouldValidate: true })}
+                error={errors[field]?.message}
+              />
+            ))}
+          </fieldset>
+          <fieldset className="grid gap-4 border-t pt-4 sm:grid-cols-2">
+            <legend className="mb-4 text-subheading">Vigencia y horario</legend>
+            {(
+              [
+                ['validFrom', 'Inicio de vigencia', 'date'],
+                ['validTo', 'Fin de vigencia', 'date'],
+                ['startTime', 'Hora de entrada', 'time'],
+                ['endTime', 'Hora de salida', 'time'],
+              ] as const
+            ).map(([field, label, type]) => (
+              <AssignmentField
+                key={field}
+                id={`${id}-${field}`}
+                label={label}
+                type={type}
+                step={type === 'time' ? 1 : undefined}
+                disabled={busy}
+                error={errors[field]?.message}
+                {...register(field, {
+                  setValueAs: (value: string) =>
+                    type === 'time' && value.length === 5 ? `${value}:00` : value,
+                })}
+              />
+            ))}
+          </fieldset>
+          <div className="flex justify-end border-t pt-4">
+            <Button type="submit" disabled={busy}>
+              Revisar creación
+            </Button>
+          </div>
         </form>
       )}
     </section>
