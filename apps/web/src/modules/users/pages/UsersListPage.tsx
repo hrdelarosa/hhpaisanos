@@ -105,8 +105,13 @@ export function UsersListPage() {
       ) : (
         <>
           {query.data.items.length ? (
-            <div className="overflow-x-auto rounded-lg border bg-card">
-              <table className="w-full text-left text-body-sm">
+            <section
+              aria-label="Tabla de cuentas"
+              // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Native scroll region needs keyboard focus.
+              tabIndex={0}
+              className="overflow-x-auto rounded-lg border bg-card"
+            >
+              <table className="w-full min-w-200 text-left text-body-sm whitespace-nowrap">
                 <caption className="sr-only">Cuentas de Guerrero</caption>
                 <thead>
                   <tr>
@@ -122,10 +127,10 @@ export function UsersListPage() {
                 <tbody>
                   {query.data.items.map((account) => (
                     <tr className="border-t" key={account.id}>
-                      <th className="p-4 font-medium whitespace-pre-wrap" scope="row">
+                      <th className="min-w-40 p-4 font-medium whitespace-pre-wrap" scope="row">
                         {account.username}
                       </th>
-                      <td className="p-4 whitespace-pre-wrap">{account.fullName}</td>
+                      <td className="min-w-56 p-4 whitespace-pre-wrap">{account.fullName}</td>
                       <td className="p-4">{account.role}</td>
                       <td className="p-4">{account.active ? 'Activa' : 'Inactiva'}</td>
                       <td className="p-4">
@@ -144,7 +149,7 @@ export function UsersListPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </section>
           ) : (
             <output>No hay cuentas en esta página para los filtros seleccionados.</output>
           )}

@@ -89,6 +89,11 @@ it('lists actual account status, preserves URL filters and does not expose extra
     ),
   );
   await screen.findByRole('rowheader', { name: account.username });
+  const tableRegion = screen.getByRole('region', { name: 'Tabla de cuentas' });
+  expect(tableRegion.tabIndex).toBe(0);
+  expect(tableRegion.contains(screen.getByRole('table', { name: 'Cuentas de Guerrero' }))).toBe(
+    true,
+  );
   expect(screen.getByRole('cell', { name: 'Activa' })).toBeTruthy();
   expect(screen.queryByText('hidden')).toBeNull();
   fireEvent.click(screen.getByRole('link', { name: `Ver cuenta ${account.username}` }));

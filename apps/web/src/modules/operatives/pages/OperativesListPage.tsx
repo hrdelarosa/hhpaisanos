@@ -100,8 +100,13 @@ export function OperativesListPage() {
       ) : (
         <>
           {query.data.items.length ? (
-            <div className="overflow-x-auto rounded-lg border bg-card">
-              <table className="w-full text-left text-body-sm">
+            <section
+              aria-label="Tabla de operativos"
+              // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Native scroll region needs keyboard focus.
+              tabIndex={0}
+              className="overflow-x-auto rounded-lg border bg-card"
+            >
+              <table className="w-full min-w-160 text-left text-body-sm whitespace-nowrap">
                 <caption className="sr-only">Operativos de Guerrero</caption>
                 <thead>
                   <tr>
@@ -115,7 +120,7 @@ export function OperativesListPage() {
                 <tbody>
                   {query.data.items.map((operative) => (
                     <tr key={operative.id} className="border-t">
-                      <th scope="row" className="p-4 font-medium">
+                      <th scope="row" className="min-w-48 p-4 font-medium whitespace-normal">
                         {operative.name}
                       </th>
                       <td className="p-4 tabular-nums">
@@ -138,7 +143,7 @@ export function OperativesListPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </section>
           ) : (
             <output className="block">
               No hay operativos en esta página para los filtros seleccionados.
