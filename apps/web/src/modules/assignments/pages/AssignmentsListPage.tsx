@@ -3,9 +3,12 @@ import { parseAsString, parseAsInteger, useQueryStates } from 'nuqs';
 import { Link, useLocation } from 'react-router';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
+import { PageHeader } from '../../../components/page-header';
+import { PaginationPage } from '../../../components/pagination-page';
+import { StatusBadge } from '../../../components/status-badge';
 import { assignmentsKey, listAssignments } from '../api/assignments';
 import { filterSchema } from '../schemas/assignments';
-import { assignmentError, assignmentStatus } from '../utils/feedback';
+import { assignmentError, assignmentStatus, assignmentStatusTone } from '../utils/feedback';
 import { ResourceName } from '../components/ResourcePicker';
 
 export function AssignmentsListPage() {
@@ -31,76 +34,77 @@ export function AssignmentsListPage() {
     enabled: parsed.success,
   });
   return (
-    <div className="space-y-4">
-      <h1 className="text-heading">Asignaciones</h1>
-      <p>
-        Períodos inclusivos y horario de México. Orden por inicio e identificador. El estado por
-        fechas es orientativo, no una autorización de asistencia.
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {(
-          [
-            ['observerId', 'Identificador del observador'],
-            ['operativeId', 'Identificador del operativo'],
-            ['attentionModuleId', 'Identificador del módulo'],
-            ['applicableOn', 'Aplicable el día'],
-            ['from', 'Períodos desde'],
-            ['to', 'Períodos hasta'],
-          ] as const
-        ).map(([key, label]) => (
-          <label key={key} className="space-y-2" htmlFor={`filter-${key}`}>
-            {label}
+    <div className="min-w-0 space-y-6">
+      <PageHeader
+        title="Asignaciones"
+        description="Períodos inclusivos y horario de México. El estado por fechas es orientativo, no una autorización de asistencia."
+      />
+      <section aria-label="Filtros de asignaciones" className="space-y-4">
+        <div className="grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-2 sm:p-6 lg:grid-cols-3">
+          {(
+            [
+              ['observerId', 'Identificador del observador'],
+              ['operativeId', 'Identificador del operativo'],
+              ['attentionModuleId', 'Identificador del módulo'],
+              ['applicableOn', 'Aplicable el día'],
+              ['from', 'Períodos desde'],
+              ['to', 'Períodos hasta'],
+            ] as const
+          ).map(([key, label]) => (
+            <label key={key} className="space-y-2" htmlFor={`filter-${key}`}>
+              {label}
+              <Input
+                id={`filter-${key}`}
+                type={key.endsWith('Id') ? 'text' : 'date'}
+                value={filters[key]}
+                onChange={(e) => void setFilters({ [key]: e.target.value, page: 1 })}
+              />
+            </label>
+          ))}
+          <label className="space-y-2" htmlFor="filter-cancelled">
+            Cancelación
+            <select
+              id="filter-cancelled"
+              className="min-h-touch w-full rounded-md border border-input bg-card px-3"
+              value={filters.cancelled}
+              onChange={(e) => void setFilters({ cancelled: e.target.value, page: 1 })}
+            >
+              <option value="">Todas</option>
+              <option value="false">No canceladas</option>
+              <option value="true">Canceladas</option>
+            </select>
+          </label>
+          <label className="space-y-2" htmlFor="filter-limit">
+            Registros por página
             <Input
-              id={`filter-${key}`}
-              type={key.endsWith('Id') ? 'text' : 'date'}
-              value={filters[key]}
-              onChange={(e) => void setFilters({ [key]: e.target.value, page: 1 })}
+              id="filter-limit"
+              type="number"
+              min={1}
+              max={100}
+              value={filters.limit}
+              onChange={(e) => void setFilters({ limit: Number(e.target.value), page: 1 })}
             />
           </label>
-        ))}
-        <label className="space-y-2" htmlFor="filter-cancelled">
-          Cancelación
-          <select
-            id="filter-cancelled"
-            className="min-h-touch w-full rounded-md border border-input bg-card px-3"
-            value={filters.cancelled}
-            onChange={(e) => void setFilters({ cancelled: e.target.value, page: 1 })}
-          >
-            <option value="">Todas</option>
-            <option value="false">No canceladas</option>
-            <option value="true">Canceladas</option>
-          </select>
-        </label>
-        <label className="space-y-2" htmlFor="filter-limit">
-          Registros por página
-          <Input
-            id="filter-limit"
-            type="number"
-            min={1}
-            max={100}
-            value={filters.limit}
-            onChange={(e) => void setFilters({ limit: Number(e.target.value), page: 1 })}
-          />
-        </label>
-      </div>
-      <Button
-        variant="secondary"
-        onClick={() =>
-          void setFilters({
-            observerId: null,
-            operativeId: null,
-            attentionModuleId: null,
-            applicableOn: null,
-            from: null,
-            to: null,
-            cancelled: null,
-            page: 1,
-            limit: 20,
-          })
-        }
-      >
-        Limpiar filtros
-      </Button>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            void setFilters({
+              observerId: null,
+              operativeId: null,
+              attentionModuleId: null,
+              applicableOn: null,
+              from: null,
+              to: null,
+              cancelled: null,
+              page: 1,
+              limit: 20,
+            })
+          }
+        >
+          Limpiar filtros
+        </Button>
+      </section>
       {!parsed.success ? (
         <p role="alert">
           Filtros inválidos: usa UUIDv7, fechas válidas y un intervalo ordenado; página positiva y
@@ -120,9 +124,19 @@ export function AssignmentsListPage() {
           {!query.data.items.length ? (
             <output>No hay asignaciones para esta página y filtros.</output>
           ) : (
-            <ul className="space-y-4">
+            <ul className="grid min-w-0 gap-4 lg:grid-cols-2">
               {query.data.items.map((item) => (
-                <li key={item.id} className="space-y-2 rounded-lg border bg-card p-4 sm:p-6">
+                <li
+                  key={item.id}
+                  className="min-w-0 space-y-3 rounded-lg border bg-card p-4 sm:p-6"
+                >
+                  <p className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-subheading">Período de asignación</span>
+                    <StatusBadge
+                      label={assignmentStatus(item)}
+                      tone={assignmentStatusTone(assignmentStatus(item))}
+                    />
+                  </p>
                   <p>
                     <strong>Observador: </strong>
                     <ResourceName kind="observer" id={item.observerId} />
@@ -138,9 +152,7 @@ export function AssignmentsListPage() {
                   <p className="tabular-nums">
                     {item.validFrom} — {item.validTo} · {item.startTime} — {item.endTime}
                   </p>
-                  <p>
-                    {assignmentStatus(item)} · Versión {item.version}
-                  </p>
+                  <p className="text-body-sm text-muted-foreground">Versión {item.version}</p>
                   <Link
                     className="inline-flex min-h-touch items-center break-all text-primary underline"
                     to={`/asignaciones/${item.id}${search}`}
@@ -151,30 +163,16 @@ export function AssignmentsListPage() {
               ))}
             </ul>
           )}
-          <nav
-            aria-label="Paginación de asignaciones"
-            className="flex flex-wrap items-center gap-4"
-          >
-            <Button
-              variant="secondary"
-              disabled={filters.page <= 1}
-              onClick={() => void setFilters({ page: filters.page - 1 })}
-            >
-              Anterior
-            </Button>
-            <p>
-              Página {query.data.page} de{' '}
-              {Math.max(1, Math.ceil(query.data.total / query.data.limit))} · {query.data.total}{' '}
-              registros
-            </p>
-            <Button
-              variant="secondary"
-              disabled={filters.page * filters.limit >= query.data.total}
-              onClick={() => void setFilters({ page: filters.page + 1 })}
-            >
-              Siguiente
-            </Button>
-          </nav>
+          <PaginationPage
+            label="Paginación de asignaciones"
+            page={query.data.page}
+            total={query.data.total}
+            limit={query.data.limit}
+            previousDisabled={filters.page <= 1}
+            nextDisabled={filters.page * filters.limit >= query.data.total}
+            onPreviousClick={() => void setFilters({ page: filters.page - 1 })}
+            onNextClick={() => void setFilters({ page: filters.page + 1 })}
+          />
         </>
       )}
     </div>

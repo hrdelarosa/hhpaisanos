@@ -57,7 +57,10 @@ export function ChangeModuleStatus({ module }: { module: AttentionModule }) {
         </p>
       )}
       {confirmation ? (
-        <section aria-labelledby="status-confirm-title" className="space-y-4">
+        <section
+          aria-labelledby="status-confirm-title"
+          className="space-y-4 rounded-md border bg-muted p-4"
+        >
           <h3 ref={summary} tabIndex={-1} id="status-confirm-title" className="text-subheading">
             Confirmar {confirmation.module.active ? 'desactivación' : 'activación'}
           </h3>

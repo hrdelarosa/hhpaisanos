@@ -2,10 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useParams } from 'react-router';
 import { z } from 'zod';
 import { Button } from '../../../components/ui/button';
+import { PageHeader } from '../../../components/page-header';
+import { StatusBadge } from '../../../components/status-badge';
 import { assignmentQuery } from '../api/assignments';
 import { ManageAssignment } from '../components/ManageAssignment';
 import { ResourceName } from '../components/ResourcePicker';
-import { assignmentError, assignmentStatus } from '../utils/feedback';
+import { assignmentError, assignmentStatus, assignmentStatusTone } from '../utils/feedback';
 
 export function AssignmentDetailPage() {
   const { id = '' } = useParams();
@@ -33,71 +35,88 @@ export function AssignmentDetailPage() {
         </div>
       ) : (
         <>
-          <h1 className="text-heading">Detalle de asignación</h1>
-          <dl className="grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-2 sm:p-6">
-            <div>
-              <dt>Identificador</dt>
-              <dd className="break-all">{query.data.id}</dd>
-            </div>
-            <div>
-              <dt>Estado por calendario de México (orientativo)</dt>
-              <dd>{assignmentStatus(query.data)}</dd>
-            </div>
-            <div>
-              <dt>Observador</dt>
-              <dd>
-                <ResourceName kind="observer" id={query.data.observerId} />
-              </dd>
-            </div>
-            <div>
-              <dt>Operativo</dt>
-              <dd>
-                <ResourceName kind="operative" id={query.data.operativeId} />
-              </dd>
-            </div>
-            <div>
-              <dt>Módulo de atención</dt>
-              <dd>
-                <ResourceName kind="module" id={query.data.attentionModuleId} />
-              </dd>
-            </div>
-            <div>
-              <dt>Vigencia inclusiva</dt>
-              <dd>
-                {query.data.validFrom} — {query.data.validTo}
-              </dd>
-            </div>
-            <div>
-              <dt>Horario de México</dt>
-              <dd>
-                {query.data.startTime} — {query.data.endTime}
-              </dd>
-            </div>
-            <div>
-              <dt>Versión</dt>
-              <dd>{query.data.version}</dd>
-            </div>
-            <div>
-              <dt>Creación</dt>
-              <dd className="break-all">
-                <time dateTime={query.data.createdAt}>{query.data.createdAt}</time>
-              </dd>
-            </div>
-            <div>
-              <dt>Actualización</dt>
-              <dd className="break-all">
-                <time dateTime={query.data.updatedAt}>{query.data.updatedAt}</time>
-              </dd>
-            </div>
-            {query.data.cancelledAt && (
+          <PageHeader
+            title="Detalle de asignación"
+            description="El estado por calendario es orientativo."
+            actions={
+              <StatusBadge
+                label={assignmentStatus(query.data)}
+                tone={assignmentStatusTone(assignmentStatus(query.data))}
+              />
+            }
+          />
+          <section className="rounded-lg border bg-card p-4 sm:p-6">
+            <h2 className="mb-6 text-subheading">Recursos, vigencia e historial</h2>
+            <dl className="grid gap-6 text-body-sm sm:grid-cols-2 [&_dt]:mb-1 [&_dt]:text-muted-foreground [&_dd]:font-medium">
               <div>
-                <dt>Cancelación confirmada</dt>
-                <dd className="break-all">
-                  <time dateTime={query.data.cancelledAt}>{query.data.cancelledAt}</time>
+                <dt>Identificador</dt>
+                <dd className="break-all">{query.data.id}</dd>
+              </div>
+              <div>
+                <dt>Estado por calendario de México (orientativo)</dt>
+                <dd>
+                  <StatusBadge
+                    label={assignmentStatus(query.data)}
+                    tone={assignmentStatusTone(assignmentStatus(query.data))}
+                  />
                 </dd>
               </div>
-            )}
-          </dl>
+              <div>
+                <dt>Observador</dt>
+                <dd>
+                  <ResourceName kind="observer" id={query.data.observerId} />
+                </dd>
+              </div>
+              <div>
+                <dt>Operativo</dt>
+                <dd>
+                  <ResourceName kind="operative" id={query.data.operativeId} />
+                </dd>
+              </div>
+              <div>
+                <dt>Módulo de atención</dt>
+                <dd>
+                  <ResourceName kind="module" id={query.data.attentionModuleId} />
+                </dd>
+              </div>
+              <div>
+                <dt>Vigencia inclusiva</dt>
+                <dd>
+                  {query.data.validFrom} — {query.data.validTo}
+                </dd>
+              </div>
+              <div>
+                <dt>Horario de México</dt>
+                <dd>
+                  {query.data.startTime} — {query.data.endTime}
+                </dd>
+              </div>
+              <div>
+                <dt>Versión</dt>
+                <dd>{query.data.version}</dd>
+              </div>
+              <div>
+                <dt>Creación</dt>
+                <dd className="break-all">
+                  <time dateTime={query.data.createdAt}>{query.data.createdAt}</time>
+                </dd>
+              </div>
+              <div>
+                <dt>Actualización</dt>
+                <dd className="break-all">
+                  <time dateTime={query.data.updatedAt}>{query.data.updatedAt}</time>
+                </dd>
+              </div>
+              {query.data.cancelledAt && (
+                <div>
+                  <dt>Cancelación confirmada</dt>
+                  <dd className="break-all">
+                    <time dateTime={query.data.cancelledAt}>{query.data.cancelledAt}</time>
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </section>
           <Link
             className="inline-flex min-h-touch items-center text-primary underline"
             to={`/asignaciones?observerId=${query.data.observerId}`}

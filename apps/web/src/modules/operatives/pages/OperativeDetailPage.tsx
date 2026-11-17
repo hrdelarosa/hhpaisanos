@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useParams } from 'react-router';
 import { z } from 'zod';
 import { Button } from '../../../components/ui/button';
+import { PageHeader } from '../../../components/page-header';
+import { StatusBadge } from '../../../components/status-badge';
 import { useSession } from '../../auth/hooks/use-session';
 import { operativeQuery } from '../api/operatives';
 import { ActivateOperative } from '../components/ActivateOperative';
@@ -33,56 +35,72 @@ export function OperativeDetailPage() {
       >
         Volver a operativos
       </Link>
-      <header className="space-y-2">
-        <p className="text-foreground-secondary">Contexto administrativo seleccionado</p>
-        <h1 className="text-heading">{operative.name}</h1>
-      </header>
-      <dl className="grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-2 sm:p-6">
-        <div>
-          <dt>Estado</dt>
-          <dd>{statusLabels[operative.status]}</dd>
-        </div>
-        <div>
-          <dt>Identificador</dt>
-          <dd className="break-all">{operative.id}</dd>
-        </div>
-        <div>
-          <dt>Fecha inicial</dt>
-          <dd>
-            <time>{operative.startDate}</time>
-          </dd>
-        </div>
-        <div>
-          <dt>Fecha final</dt>
-          <dd>
-            <time>{operative.endDate}</time>
-          </dd>
-        </div>
-        <div>
-          <dt>
-            {operative.status === 'borrador'
-              ? 'Tolerancia almacenada (aún sin activar)'
-              : 'Tolerancia de llegada'}
-          </dt>
-          <dd>
-            {operative.arrivalToleranceMinutes === null
-              ? 'Sin configurar'
-              : `${operative.arrivalToleranceMinutes} minutos`}
-          </dd>
-        </div>
-        <div>
-          <dt>Creado (UTC)</dt>
-          <dd className="break-all">
-            <time dateTime={operative.createdAt}>{operative.createdAt}</time>
-          </dd>
-        </div>
-        <div>
-          <dt>Actualizado (UTC)</dt>
-          <dd className="break-all">
-            <time dateTime={operative.updatedAt}>{operative.updatedAt}</time>
-          </dd>
-        </div>
-      </dl>
+      <PageHeader
+        title={operative.name}
+        description="Contexto administrativo seleccionado"
+        actions={
+          <StatusBadge
+            label={statusLabels[operative.status]}
+            tone={
+              operative.status === 'activo'
+                ? 'success'
+                : operative.status === 'borrador'
+                  ? 'warning'
+                  : 'neutral'
+            }
+          />
+        }
+      />
+      <section
+        aria-labelledby="operative-summary-title"
+        className="rounded-lg border bg-card p-4 sm:p-6"
+      >
+        <h2 id="operative-summary-title" className="mb-6 text-subheading">
+          Información del operativo
+        </h2>
+        <dl className="grid gap-6 text-body-sm sm:grid-cols-2 [&_dt]:mb-1 [&_dt]:text-muted-foreground [&_dd]:font-medium">
+          <div>
+            <dt>Identificador</dt>
+            <dd className="break-all">{operative.id}</dd>
+          </div>
+          <div>
+            <dt>Fecha inicial</dt>
+            <dd>
+              <time>{operative.startDate}</time>
+            </dd>
+          </div>
+          <div>
+            <dt>Fecha final</dt>
+            <dd>
+              <time>{operative.endDate}</time>
+            </dd>
+          </div>
+          <div>
+            <dt>
+              {operative.status === 'borrador'
+                ? 'Tolerancia almacenada (aún sin activar)'
+                : 'Tolerancia de llegada'}
+            </dt>
+            <dd>
+              {operative.arrivalToleranceMinutes === null
+                ? 'Sin configurar'
+                : `${operative.arrivalToleranceMinutes} minutos`}
+            </dd>
+          </div>
+          <div>
+            <dt>Creado (UTC)</dt>
+            <dd className="break-all">
+              <time dateTime={operative.createdAt}>{operative.createdAt}</time>
+            </dd>
+          </div>
+          <div>
+            <dt>Actualizado (UTC)</dt>
+            <dd className="break-all">
+              <time dateTime={operative.updatedAt}>{operative.updatedAt}</time>
+            </dd>
+          </div>
+        </dl>
+      </section>
       {user?.permissions.includes('assignments:read') && (
         <Link
           className="inline-flex min-h-touch items-center text-primary underline"

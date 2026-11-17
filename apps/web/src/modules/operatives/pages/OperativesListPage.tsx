@@ -3,7 +3,13 @@ import { createParser, parseAsString, parseAsStringEnum, useQueryStates } from '
 import { Link, useLocation } from 'react-router';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
+import { DataTable, type DataTableColumn } from '../../../components/data-table';
+import { PageHeader } from '../../../components/page-header';
+import { PaginationPage } from '../../../components/pagination-page';
+import { StatusBadge } from '../../../components/status-badge';
+import { useSession } from '../../auth/hooks/use-session';
 import { listOperatives, operativesKey } from '../api/operatives';
+import type { Operative } from '../schemas/operatives';
 import { operativeError, statusLabels } from '../utils/feedback';
 
 function positiveInteger(max: number) {
@@ -18,7 +24,47 @@ function positiveInteger(max: number) {
     serialize: String,
   });
 }
+
+const columns: DataTableColumn<Operative>[] = [
+  {
+    key: 'name',
+    header: 'Nombre',
+    rowHeader: true,
+    cellClassName: 'min-w-48',
+    render: (operative) => operative.name,
+  },
+  {
+    key: 'start',
+    header: 'Inicio',
+    cellClassName: 'tabular-nums whitespace-nowrap',
+    render: (operative) => <time>{operative.startDate}</time>,
+  },
+  {
+    key: 'end',
+    header: 'Fin',
+    cellClassName: 'tabular-nums whitespace-nowrap',
+    render: (operative) => <time>{operative.endDate}</time>,
+  },
+  {
+    key: 'status',
+    header: 'Estado',
+    render: (operative) => (
+      <StatusBadge
+        label={statusLabels[operative.status]}
+        tone={
+          operative.status === 'activo'
+            ? 'success'
+            : operative.status === 'borrador'
+              ? 'warning'
+              : 'neutral'
+        }
+      />
+    ),
+  },
+];
+
 export function OperativesListPage() {
+  const { user } = useSession();
   const [filters, setFilters] = useQueryStates(
     {
       name: parseAsString.withDefault(''),
@@ -36,141 +82,114 @@ export function OperativesListPage() {
     enabled: valid,
   });
   return (
-    <div className="space-y-4">
-      <h1 className="text-heading">Operativos</h1>
-      <p>Orden: fecha inicial descendente y, en caso de empate, identificador descendente.</p>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <label className="space-y-2" htmlFor="operative-search">
-          Nombre
-          <Input
-            id="operative-search"
-            value={filters.name}
-            onChange={(event) => void setFilters({ name: event.target.value, page: 1 })}
-          />
-        </label>
-        <div className="space-y-2">
-          <label htmlFor="operative-status">Estado</label>
-          <select
-            id="operative-status"
-            className="flex min-h-touch w-full rounded-md border border-input bg-card px-3 text-body focus-visible:outline-2 focus-visible:outline-ring"
-            value={filters.status}
-            onChange={(event) => void setFilters({ status: event.target.value, page: 1 })}
-          >
-            <option value="">Todos</option>
-            {Object.entries(statusLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+    <div className="min-w-0 space-y-6">
+      <PageHeader
+        title="Operativos"
+        description="Consulta los periodos de operación y su estado administrativo."
+        actions={
+          user?.permissions.includes('operatives:create') && (
+            <Link
+              className="inline-flex min-h-touch items-center justify-center rounded-md bg-primary px-4 py-2 text-label text-primary-foreground hover:bg-primary-hover"
+              to="/operativos/nuevo"
+            >
+              Crear operativo
+            </Link>
+          )
+        }
+      />
+      <section aria-label="Filtros de operativos" className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <label className="block space-y-2 text-label" htmlFor="operative-search">
+            Nombre
+            <Input
+              id="operative-search"
+              value={filters.name}
+              onChange={(event) => void setFilters({ name: event.target.value, page: 1 })}
+            />
+          </label>
+          <div className="space-y-2">
+            <label className="text-label" htmlFor="operative-status">
+              Estado
+            </label>
+            <select
+              id="operative-status"
+              className="flex min-h-touch w-full rounded-md border border-input bg-card px-3 text-body focus-visible:outline-2 focus-visible:outline-ring"
+              value={filters.status}
+              onChange={(event) => void setFilters({ status: event.target.value, page: 1 })}
+            >
+              <option value="">Todos</option>
+              {Object.entries(statusLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="block space-y-2 text-label" htmlFor="operative-limit">
+            Registros por página
+            <Input
+              id="operative-limit"
+              type="number"
+              min={1}
+              max={100}
+              value={filters.limit}
+              onChange={(event) => {
+                const limit = Number(event.target.value);
+                if (Number.isInteger(limit) && limit >= 1 && limit <= 100)
+                  void setFilters({ limit, page: 1 });
+              }}
+            />
+          </label>
         </div>
-        <label className="space-y-2" htmlFor="operative-limit">
-          Registros por página
-          <Input
-            id="operative-limit"
-            type="number"
-            min={1}
-            max={100}
-            value={filters.limit}
-            onChange={(event) => {
-              const limit = Number(event.target.value);
-              if (Number.isInteger(limit) && limit >= 1 && limit <= 100)
-                void setFilters({ limit, page: 1 });
-            }}
-          />
-        </label>
-      </div>
-      <Button
-        variant="secondary"
-        onClick={() => void setFilters({ name: null, status: null, page: 1 })}
-      >
-        Limpiar filtros
-      </Button>
+        <Button
+          variant="secondary"
+          onClick={() => void setFilters({ name: null, status: null, page: 1 })}
+        >
+          Limpiar filtros
+        </Button>
+      </section>
+      <p className="text-body-sm text-muted-foreground">
+        Orden: fecha inicial descendente y, en caso de empate, identificador descendente.
+      </p>
       {!valid ? (
         <p role="alert">El nombre admite hasta 120 caracteres.</p>
-      ) : query.isPending ? (
-        <output className="block">Cargando operativos…</output>
-      ) : query.isError ? (
-        <div role="alert" className="space-y-2">
-          <p>{operativeError(query.error)}</p>
-          <Button variant="secondary" onClick={() => void query.refetch()}>
-            Reintentar
-          </Button>
-        </div>
       ) : (
-        <>
-          {query.data.items.length ? (
-            <section
-              aria-label="Tabla de operativos"
-              // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Native scroll region needs keyboard focus.
-              tabIndex={0}
-              className="overflow-x-auto rounded-lg border bg-card"
+        <DataTable
+          columns={columns}
+          data={query.data?.items}
+          isPending={query.isPending}
+          isError={query.isError}
+          isSuccess={query.isSuccess}
+          onRetry={() => void query.refetch()}
+          getRowKey={(operative) => operative.id}
+          caption="Operativos de Guerrero"
+          regionLabel="Tabla de operativos"
+          tableClassName="min-w-160"
+          loadingMessage="Cargando operativos…"
+          emptyMessage="No hay operativos en esta página para los filtros seleccionados."
+          errorMessage={query.isError ? operativeError(query.error) : ''}
+          renderActions={(operative) => (
+            <Link
+              className="inline-flex min-h-touch items-center text-primary underline underline-offset-4"
+              aria-label={`Ver detalle de ${operative.name}`}
+              to={`/operativos/${operative.id}${search}`}
             >
-              <table className="w-full min-w-160 text-left text-body-sm whitespace-nowrap">
-                <caption className="sr-only">Operativos de Guerrero</caption>
-                <thead>
-                  <tr>
-                    {['Nombre', 'Inicio', 'Fin', 'Estado', 'Contexto'].map((label) => (
-                      <th key={label} scope="col" className="p-4">
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {query.data.items.map((operative) => (
-                    <tr key={operative.id} className="border-t">
-                      <th scope="row" className="min-w-48 p-4 font-medium whitespace-normal">
-                        {operative.name}
-                      </th>
-                      <td className="p-4 tabular-nums">
-                        <time>{operative.startDate}</time>
-                      </td>
-                      <td className="p-4 tabular-nums">
-                        <time>{operative.endDate}</time>
-                      </td>
-                      <td className="p-4">{statusLabels[operative.status]}</td>
-                      <td className="p-4">
-                        <Link
-                          className="inline-flex min-h-touch items-center text-primary underline"
-                          aria-label={`Ver detalle de ${operative.name}`}
-                          to={`/operativos/${operative.id}${search}`}
-                        >
-                          Ver detalle
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          ) : (
-            <output className="block">
-              No hay operativos en esta página para los filtros seleccionados.
-            </output>
+              Ver detalle
+            </Link>
           )}
-          <nav aria-label="Paginación de operativos" className="flex flex-wrap items-center gap-4">
-            <Button
-              variant="secondary"
-              disabled={filters.page <= 1}
-              onClick={() => void setFilters({ page: filters.page - 1 })}
-            >
-              Anterior
-            </Button>
-            <p className="tabular-nums">
-              Página {query.data.page} de{' '}
-              {Math.max(1, Math.ceil(query.data.total / query.data.limit))} · {query.data.total}{' '}
-              registros
-            </p>
-            <Button
-              variant="secondary"
-              disabled={filters.page * filters.limit >= query.data.total}
-              onClick={() => void setFilters({ page: filters.page + 1 })}
-            >
-              Siguiente
-            </Button>
-          </nav>
-        </>
+        />
+      )}
+      {valid && query.isSuccess && (
+        <PaginationPage
+          label="Paginación de operativos"
+          page={query.data.page}
+          total={query.data.total}
+          limit={query.data.limit}
+          previousDisabled={filters.page <= 1}
+          nextDisabled={filters.page * filters.limit >= query.data.total}
+          onPreviousClick={() => void setFilters({ page: filters.page - 1 })}
+          onNextClick={() => void setFilters({ page: filters.page + 1 })}
+        />
       )}
     </div>
   );

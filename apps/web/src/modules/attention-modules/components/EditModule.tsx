@@ -44,7 +44,7 @@ export function EditModule({ module }: { module: AttentionModule }) {
   return (
     <section className="max-w-form space-y-4 rounded-lg border bg-card p-4 sm:p-6">
       <h2 className="text-heading-sm">Editar módulo</h2>
-      <p>
+      <p className="text-body-sm text-muted-foreground">
         Solo se pueden modificar nombre y municipio. Cualquier asignación existente, incluso
         cancelada, bloquea cambios efectivos.
       </p>
@@ -57,7 +57,7 @@ export function EditModule({ module }: { module: AttentionModule }) {
       )}
       <form
         noValidate
-        className="space-y-4"
+        className="space-y-6"
         onSubmit={handleSubmit((input) => {
           if (mutation.isPending) return;
           if (input.name === baseline.name && input.municipality === baseline.municipality) {
@@ -67,32 +67,37 @@ export function EditModule({ module }: { module: AttentionModule }) {
           mutation.mutate(input);
         })}
       >
-        <ModuleField
-          id="edit-name"
-          label="Nombre"
-          error={errors.name?.message}
-          disabled={mutation.isPending}
-          {...register('name')}
-        />
-        <ModuleField
-          id="edit-municipality"
-          label="Municipio"
-          error={errors.municipality?.message}
-          disabled={mutation.isPending}
-          {...register('municipality')}
-        />
-        <ModuleField
-          id="edit-reason"
-          label="Motivo de edición"
-          error={errors.reason?.message}
-          disabled={mutation.isPending}
-          {...register('reason')}
-        />
-        <p>
-          Si los datos cambiaron o el resultado es incierto, revisa el detalle y carga los datos
-          actuales. Esto reemplaza el formulario.
-        </p>
-        <div className="flex flex-wrap gap-4">
+        <fieldset className="grid min-w-0 gap-4 sm:grid-cols-2">
+          <legend className="mb-4 text-label">Datos del punto de atención</legend>
+          <ModuleField
+            id="edit-name"
+            label="Nombre"
+            error={errors.name?.message}
+            disabled={mutation.isPending}
+            {...register('name')}
+          />
+          <ModuleField
+            id="edit-municipality"
+            label="Municipio"
+            error={errors.municipality?.message}
+            disabled={mutation.isPending}
+            {...register('municipality')}
+          />
+        </fieldset>
+        <div className="space-y-4 border-t pt-4">
+          <ModuleField
+            id="edit-reason"
+            label="Motivo de edición"
+            error={errors.reason?.message}
+            disabled={mutation.isPending}
+            {...register('reason')}
+          />
+          <p className="text-body-sm text-muted-foreground">
+            Si los datos cambiaron o el resultado es incierto, revisa el detalle y carga los datos
+            actuales. Esto reemplaza el formulario.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
           <Button type="submit" disabled={mutation.isPending || mutation.isSuccess}>
             {mutation.isPending ? 'Guardando…' : 'Guardar cambios'}
           </Button>

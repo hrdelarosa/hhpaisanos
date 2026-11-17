@@ -298,7 +298,7 @@ it('does not send a delayed GPS result after the authenticated account changes',
     focusManager.setFocused(false);
     focusManager.setFocused(true);
   });
-  await screen.findByText('Persona sintética B', { selector: 'header p' });
+  await screen.findByLabelText('Cuenta de Persona sintética B, OBSERVADOR');
   await act(async () => {
     getCurrentPosition.mock.calls[0][0]({ coords: evidence } as GeolocationPosition);
   });
@@ -328,7 +328,7 @@ it('continues location acquisition after a completed same-identity session reval
   );
   await screen.findByText('Verificando sesión…');
   revalidation.resolve(Response.json(observer));
-  await screen.findByText('Persona sintética A', { selector: 'header p' });
+  await screen.findByLabelText('Cuenta de Persona sintética A, OBSERVADOR');
   await act(async () => {
     getCurrentPosition.mock.calls[0][0]({ coords: evidence } as GeolocationPosition);
   });

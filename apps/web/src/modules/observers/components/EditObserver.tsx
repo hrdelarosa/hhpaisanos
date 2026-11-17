@@ -52,7 +52,7 @@ export function EditObserver({ observer }: { observer: Observer }) {
   return (
     <section className="max-w-form space-y-4 rounded-lg border bg-card p-4 sm:p-6">
       <h2 className="text-heading-sm">Editar observador</h2>
-      <p>
+      <p className="text-body-sm text-muted-foreground">
         Solo nombres, apellidos y teléfono. Deja el teléfono vacío para eliminarlo. Se conservan
         espacios y escritura originales.
       </p>
@@ -66,7 +66,7 @@ export function EditObserver({ observer }: { observer: Observer }) {
       )}
       <form
         noValidate
-        className="space-y-4"
+        className="space-y-6"
         onSubmit={handleSubmit((input) => {
           if (mutation.isPending || reloading || mutation.isSuccess || mutation.isError) return;
           if (
@@ -80,40 +80,47 @@ export function EditObserver({ observer }: { observer: Observer }) {
           mutation.mutate(input);
         })}
       >
-        <ObserverField
-          id="edit-firstNames"
-          label="Nombres"
-          error={errors.firstNames?.message}
-          disabled={mutation.isPending || reloading}
-          {...register('firstNames')}
-        />
-        <ObserverField
-          id="edit-lastNames"
-          label="Apellidos"
-          error={errors.lastNames?.message}
-          disabled={mutation.isPending || reloading}
-          {...register('lastNames')}
-        />
-        <ObserverField
-          id="edit-phone"
-          label="Teléfono (opcional)"
-          type="tel"
-          error={errors.phone?.message}
-          disabled={mutation.isPending || reloading}
-          {...register('phone')}
-        />
-        <ObserverField
-          id="edit-reason"
-          label="Motivo de edición"
-          error={errors.reason?.message}
-          disabled={mutation.isPending || reloading}
-          {...register('reason')}
-        />
-        <p>
-          Tras un envío o si los datos cambiaron, revisa el detalle y carga los datos actuales. Esto
-          reemplaza el formulario.
-        </p>
-        <div className="flex flex-wrap gap-4">
+        <fieldset className="grid min-w-0 gap-4 sm:grid-cols-2">
+          <legend className="mb-4 text-label">Datos del perfil</legend>
+          <ObserverField
+            id="edit-firstNames"
+            label="Nombres"
+            error={errors.firstNames?.message}
+            disabled={mutation.isPending || reloading}
+            {...register('firstNames')}
+          />
+          <div className="sm:col-span-2">
+            <ObserverField
+              id="edit-lastNames"
+              label="Apellidos"
+              error={errors.lastNames?.message}
+              disabled={mutation.isPending || reloading}
+              {...register('lastNames')}
+            />
+          </div>
+        </fieldset>
+        <div className="space-y-4 border-t pt-4">
+          <ObserverField
+            id="edit-phone"
+            label="Teléfono (opcional)"
+            type="tel"
+            error={errors.phone?.message}
+            disabled={mutation.isPending || reloading}
+            {...register('phone')}
+          />
+          <ObserverField
+            id="edit-reason"
+            label="Motivo de edición"
+            error={errors.reason?.message}
+            disabled={mutation.isPending || reloading}
+            {...register('reason')}
+          />
+          <p className="text-body-sm text-muted-foreground">
+            Tras un envío o si los datos cambiaron, revisa el detalle y carga los datos actuales.
+            Esto reemplaza el formulario.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
           <Button
             type="submit"
             disabled={mutation.isPending || reloading || mutation.isSuccess || mutation.isError}

@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useParams } from 'react-router';
 import { z } from 'zod';
 import { Button } from '../../../components/ui/button';
+import { PageHeader } from '../../../components/page-header';
+import { StatusBadge } from '../../../components/status-badge';
 import { useSession } from '../../auth/hooks/use-session';
 import { moduleQuery } from '../api/attention-modules';
 import { EditModule } from '../components/EditModule';
@@ -34,33 +36,46 @@ export function ModuleDetailPage() {
       >
         Volver a módulos
       </Link>
-      <h1 className="text-heading">{module.name}</h1>
-      <dl className="grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-2 sm:p-6">
-        <div>
-          <dt>Municipio</dt>
-          <dd>{module.municipality}</dd>
-        </div>
-        <div>
-          <dt>Estado</dt>
-          <dd>{module.active ? 'Activo' : 'Inactivo'}</dd>
-        </div>
-        <div>
-          <dt>Identificador</dt>
-          <dd className="break-all">{module.id}</dd>
-        </div>
-        <div>
-          <dt>Creado (UTC)</dt>
-          <dd className="break-all">
-            <time dateTime={module.createdAt}>{module.createdAt}</time>
-          </dd>
-        </div>
-        <div>
-          <dt>Actualizado (UTC)</dt>
-          <dd className="break-all">
-            <time dateTime={module.updatedAt}>{module.updatedAt}</time>
-          </dd>
-        </div>
-      </dl>
+      <PageHeader
+        title={module.name}
+        description="Información y disponibilidad del punto de atención."
+        actions={
+          <StatusBadge
+            label={module.active ? 'Activo' : 'Inactivo'}
+            tone={module.active ? 'success' : 'neutral'}
+          />
+        }
+      />
+      <section
+        aria-labelledby="module-summary-title"
+        className="rounded-lg border bg-card p-4 sm:p-6"
+      >
+        <h2 id="module-summary-title" className="mb-6 text-subheading">
+          Información del módulo
+        </h2>
+        <dl className="grid gap-6 text-body-sm sm:grid-cols-2 [&_dt]:mb-1 [&_dt]:text-muted-foreground [&_dd]:font-medium">
+          <div>
+            <dt>Municipio</dt>
+            <dd>{module.municipality}</dd>
+          </div>
+          <div>
+            <dt>Identificador</dt>
+            <dd className="break-all">{module.id}</dd>
+          </div>
+          <div>
+            <dt>Creado (UTC)</dt>
+            <dd className="break-all">
+              <time dateTime={module.createdAt}>{module.createdAt}</time>
+            </dd>
+          </div>
+          <div>
+            <dt>Actualizado (UTC)</dt>
+            <dd className="break-all">
+              <time dateTime={module.updatedAt}>{module.updatedAt}</time>
+            </dd>
+          </div>
+        </dl>
+      </section>
       {user?.permissions.includes('assignments:read') && (
         <Link
           className="inline-flex min-h-touch items-center text-primary underline"

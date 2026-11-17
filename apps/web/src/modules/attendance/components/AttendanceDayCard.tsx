@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { StatusBadge } from '../../../components/status-badge';
 import type { AttendanceDay, AttendanceMark } from '../schemas/attendance';
 
 export const reviewLabels = {
@@ -7,13 +8,6 @@ export const reviewLabels = {
   accepted_administrative: 'Aceptada administrativamente',
   rejected: 'Rechazada',
   annulled: 'Anulada',
-};
-const reviewStyles = {
-  accepted_automatic: 'bg-info-surface text-info',
-  pending_review: 'bg-warning-surface text-warning',
-  accepted_administrative: 'bg-info-surface text-info',
-  rejected: 'bg-danger-surface text-destructive',
-  annulled: 'bg-danger-surface text-destructive',
 };
 const anomalyLabels = {
   late_arrival: 'Llegada tardía',
@@ -45,11 +39,16 @@ export function AttendanceMarkView({
           </p>
           <p>Versión {mark.version}</p>
           <p>
-            <span
-              className={`inline-block rounded-full px-3 py-1 text-label ${reviewStyles[mark.reviewStatus]}`}
-            >
-              {reviewLabels[mark.reviewStatus]}
-            </span>
+            <StatusBadge
+              label={reviewLabels[mark.reviewStatus]}
+              tone={
+                mark.reviewStatus === 'pending_review'
+                  ? 'warning'
+                  : mark.reviewStatus === 'rejected' || mark.reviewStatus === 'annulled'
+                    ? 'danger'
+                    : 'info'
+              }
+            />
           </p>
           <h4 className="font-medium">Anomalías calculadas</h4>
           {mark.anomalies.length ? (

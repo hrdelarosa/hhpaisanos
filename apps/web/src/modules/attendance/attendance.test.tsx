@@ -170,7 +170,7 @@ it.each(['/mi-asistencia', '/mi-asistencia/historial'])(
 it('keeps an ordinary API 403 distinct from session expiry', async () => {
   mount('/mi-asistencia', new Response(null, { status: 403 }));
   await screen.findByText(/No se autorizó la consulta/);
-  expect(screen.getByText('Persona sintética', { selector: 'header p' })).toBeTruthy();
+  expect(screen.getByLabelText('Cuenta de Persona sintética, OBSERVADOR')).toBeTruthy();
 });
 
 it('uses the existing 401 session handling', async () => {

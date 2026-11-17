@@ -9,6 +9,8 @@ import { AdministrativeMarkCard } from '../components/AdministrativeMarkCard';
 import { reviewLabels } from '../components/AttendanceDayCard';
 import { administrativeAttendanceError } from '../utils/administration';
 import { useSession } from '../../auth/hooks/use-session';
+import { PageHeader } from '../../../components/page-header';
+import { PaginationPage } from '../../../components/pagination-page';
 
 export function AdministrativeAttendanceListPage() {
   const { user } = useSession();
@@ -35,100 +37,103 @@ export function AdministrativeAttendanceListPage() {
     enabled: parsed.success,
   });
   return (
-    <div className="space-y-4">
-      <h1 className="text-heading">Asistencias administrativas</h1>
-      {user?.permissions.includes('attendance:capture-manual') && (
-        <Link
-          className="inline-flex min-h-touch items-center text-primary underline"
-          to="/asistencias/manual"
-        >
-          Crear captura manual
-        </Link>
-      )}
-      <p>
-        Registros vigentes, ordenados por fecha descendente. La captura y la decisión administrativa
-        son independientes.
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {(
-          [
-            ['operativeId', 'Identificador del operativo'],
-            ['observerId', 'Identificador del observador'],
-            ['moduleId', 'Identificador del módulo'],
-            ['from', 'Desde'],
-            ['to', 'Hasta'],
-          ] as const
-        ).map(([key, label]) => (
-          <label key={key} className="space-y-2" htmlFor={`attendance-${key}`}>
-            {label}
+    <div className="min-w-0 space-y-6">
+      <PageHeader
+        title="Asistencias administrativas"
+        description="Registros vigentes, ordenados por fecha descendente. La captura y la decisión administrativa son independientes."
+        actions={
+          user?.permissions.includes('attendance:capture-manual') && (
+            <Link
+              className="inline-flex min-h-touch items-center justify-center rounded-md bg-primary px-4 py-2 text-label text-primary-foreground hover:bg-primary-hover"
+              to="/asistencias/manual"
+            >
+              Crear captura manual
+            </Link>
+          )
+        }
+      />
+      <section aria-label="Filtros de asistencias" className="space-y-4">
+        <div className="grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-2 sm:p-6 lg:grid-cols-3">
+          {(
+            [
+              ['operativeId', 'Identificador del operativo'],
+              ['observerId', 'Identificador del observador'],
+              ['moduleId', 'Identificador del módulo'],
+              ['from', 'Desde'],
+              ['to', 'Hasta'],
+            ] as const
+          ).map(([key, label]) => (
+            <label key={key} className="space-y-2" htmlFor={`attendance-${key}`}>
+              {label}
+              <Input
+                id={`attendance-${key}`}
+                type={key.endsWith('Id') ? 'text' : 'date'}
+                value={filters[key]}
+                onChange={(e) => void setFilters({ [key]: e.target.value, page: 1 })}
+              />
+            </label>
+          ))}
+          <label className="space-y-2" htmlFor="attendance-status">
+            Estado de revisión
+            <select
+              id="attendance-status"
+              className="min-h-touch w-full rounded-md border border-input bg-card px-3"
+              value={filters.reviewStatus}
+              onChange={(e) => void setFilters({ reviewStatus: e.target.value, page: 1 })}
+            >
+              <option value="">Todos</option>
+              {Object.entries(reviewLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-2" htmlFor="attendance-anomaly">
+            Anomalía
+            <select
+              id="attendance-anomaly"
+              className="min-h-touch w-full rounded-md border border-input bg-card px-3"
+              value={filters.anomaly}
+              onChange={(e) => void setFilters({ anomaly: e.target.value, page: 1 })}
+            >
+              <option value="">Todas</option>
+              <option value="late_arrival">Llegada tardía</option>
+              <option value="early_departure">Salida temprana</option>
+              <option value="missing_location">Sin ubicación</option>
+            </select>
+          </label>
+          <label className="space-y-2" htmlFor="attendance-limit">
+            Registros por página
             <Input
-              id={`attendance-${key}`}
-              type={key.endsWith('Id') ? 'text' : 'date'}
-              value={filters[key]}
-              onChange={(e) => void setFilters({ [key]: e.target.value, page: 1 })}
+              id="attendance-limit"
+              type="number"
+              min={1}
+              max={100}
+              value={filters.limit}
+              onChange={(e) => void setFilters({ limit: Number(e.target.value), page: 1 })}
             />
           </label>
-        ))}
-        <label className="space-y-2" htmlFor="attendance-status">
-          Estado de revisión
-          <select
-            id="attendance-status"
-            className="min-h-touch w-full rounded-md border border-input bg-card px-3"
-            value={filters.reviewStatus}
-            onChange={(e) => void setFilters({ reviewStatus: e.target.value, page: 1 })}
-          >
-            <option value="">Todos</option>
-            {Object.entries(reviewLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-2" htmlFor="attendance-anomaly">
-          Anomalía
-          <select
-            id="attendance-anomaly"
-            className="min-h-touch w-full rounded-md border border-input bg-card px-3"
-            value={filters.anomaly}
-            onChange={(e) => void setFilters({ anomaly: e.target.value, page: 1 })}
-          >
-            <option value="">Todas</option>
-            <option value="late_arrival">Llegada tardía</option>
-            <option value="early_departure">Salida temprana</option>
-            <option value="missing_location">Sin ubicación</option>
-          </select>
-        </label>
-        <label className="space-y-2" htmlFor="attendance-limit">
-          Registros por página
-          <Input
-            id="attendance-limit"
-            type="number"
-            min={1}
-            max={100}
-            value={filters.limit}
-            onChange={(e) => void setFilters({ limit: Number(e.target.value), page: 1 })}
-          />
-        </label>
-      </div>
-      <Button
-        variant="secondary"
-        onClick={() =>
-          void setFilters({
-            operativeId: null,
-            observerId: null,
-            moduleId: null,
-            from: null,
-            to: null,
-            reviewStatus: null,
-            anomaly: null,
-            page: 1,
-            limit: 20,
-          })
-        }
-      >
-        Limpiar filtros
-      </Button>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            void setFilters({
+              operativeId: null,
+              observerId: null,
+              moduleId: null,
+              from: null,
+              to: null,
+              reviewStatus: null,
+              anomaly: null,
+              page: 1,
+              limit: 20,
+            })
+          }
+        >
+          Limpiar filtros
+        </Button>
+      </section>
       {!parsed.success ? (
         <p role="alert">
           Filtros inválidos: usa UUIDv7, fechas e intervalo válidos, página positiva y límite de 1 a
@@ -162,27 +167,16 @@ export function AdministrativeAttendanceListPage() {
               ))}
             </ul>
           )}
-          <nav aria-label="Paginación de asistencias" className="flex flex-wrap items-center gap-4">
-            <Button
-              variant="secondary"
-              disabled={filters.page <= 1}
-              onClick={() => void setFilters({ page: filters.page - 1 })}
-            >
-              Anterior
-            </Button>
-            <p>
-              Página {query.data.page} de{' '}
-              {Math.max(1, Math.ceil(query.data.total / query.data.limit))} · {query.data.total}{' '}
-              registros
-            </p>
-            <Button
-              variant="secondary"
-              disabled={filters.page * filters.limit >= query.data.total}
-              onClick={() => void setFilters({ page: filters.page + 1 })}
-            >
-              Siguiente
-            </Button>
-          </nav>
+          <PaginationPage
+            label="Paginación de asistencias"
+            page={query.data.page}
+            total={query.data.total}
+            limit={query.data.limit}
+            previousDisabled={filters.page <= 1}
+            nextDisabled={filters.page * filters.limit >= query.data.total}
+            onPreviousClick={() => void setFilters({ page: filters.page - 1 })}
+            onNextClick={() => void setFilters({ page: filters.page + 1 })}
+          />
         </>
       )}
     </div>
