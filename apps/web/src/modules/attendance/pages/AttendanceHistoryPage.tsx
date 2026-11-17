@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { createParser, parseAsInteger, parseAsString, useQueryStates } from 'nuqs';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
+import { PageHeader } from '../../../components/page-header';
+import { PaginationPage } from '../../../components/pagination-page';
 import { getHistory } from '../api/attendance';
 import { AttendanceDayCard } from '../components/AttendanceDayCard';
 import { AttendanceError } from '../components/AttendanceError';
@@ -37,57 +39,58 @@ export function AttendanceHistoryPage() {
     enabled: valid,
   });
   return (
-    <div className="space-y-4">
-      <h1 className="text-heading">Historial de mi asistencia</h1>
-      <p>
-        Solo se muestran fechas con marcas registradas. Las anomalías se conservan aunque la
-        revisión las acepte.
-      </p>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <label htmlFor="attendance-from" className="space-y-2">
-          Desde
-          <Input
-            id="attendance-from"
-            type="date"
-            min="1000-01-01"
-            max="9999-12-31"
-            value={filters.from}
-            onChange={(event) => void setFilters({ from: event.target.value, page: 1 })}
-          />
-        </label>
-        <label htmlFor="attendance-to" className="space-y-2">
-          Hasta
-          <Input
-            id="attendance-to"
-            type="date"
-            min="1000-01-01"
-            max="9999-12-31"
-            value={filters.to}
-            onChange={(event) => void setFilters({ to: event.target.value, page: 1 })}
-          />
-        </label>
-        <label htmlFor="attendance-limit" className="space-y-2">
-          Registros por página
-          <Input
-            id="attendance-limit"
-            type="number"
-            min={1}
-            max={100}
-            value={filters.limit}
-            onChange={(event) => {
-              const limit = Number(event.target.value);
-              if (Number.isInteger(limit) && limit >= 1 && limit <= 100)
-                void setFilters({ limit, page: 1 });
-            }}
-          />
-        </label>
-      </div>
-      <Button
-        variant="secondary"
-        onClick={() => void setFilters({ from: null, to: null, page: 1 })}
-      >
-        Limpiar fechas
-      </Button>
+    <div className="min-w-0 space-y-6">
+      <PageHeader
+        title="Historial de mi asistencia"
+        description="Solo se muestran fechas con marcas registradas. Las anomalías se conservan aunque la revisión las acepte."
+      />
+      <section aria-label="Filtros del historial" className="space-y-4">
+        <div className="grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-3 sm:p-6">
+          <label htmlFor="attendance-from" className="space-y-2">
+            Desde
+            <Input
+              id="attendance-from"
+              type="date"
+              min="1000-01-01"
+              max="9999-12-31"
+              value={filters.from}
+              onChange={(event) => void setFilters({ from: event.target.value, page: 1 })}
+            />
+          </label>
+          <label htmlFor="attendance-to" className="space-y-2">
+            Hasta
+            <Input
+              id="attendance-to"
+              type="date"
+              min="1000-01-01"
+              max="9999-12-31"
+              value={filters.to}
+              onChange={(event) => void setFilters({ to: event.target.value, page: 1 })}
+            />
+          </label>
+          <label htmlFor="attendance-limit" className="space-y-2">
+            Registros por página
+            <Input
+              id="attendance-limit"
+              type="number"
+              min={1}
+              max={100}
+              value={filters.limit}
+              onChange={(event) => {
+                const limit = Number(event.target.value);
+                if (Number.isInteger(limit) && limit >= 1 && limit <= 100)
+                  void setFilters({ limit, page: 1 });
+              }}
+            />
+          </label>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() => void setFilters({ from: null, to: null, page: 1 })}
+        >
+          Limpiar fechas
+        </Button>
+      </section>
       {!valid ? (
         <p role="alert">
           Usa fechas válidas entre 1000 y 9999 y un intervalo donde Desde no sea posterior a Hasta.
@@ -107,29 +110,18 @@ export function AttendanceHistoryPage() {
               No hay registros en esta página para las fechas seleccionadas.
             </output>
           )}
-          <nav aria-label="Paginación del historial" className="flex flex-wrap items-center gap-4">
-            <Button
-              variant="secondary"
-              disabled={filters.page <= 1}
-              onClick={() => void setFilters({ page: filters.page - 1 })}
-            >
-              Anterior
-            </Button>
-            <p className="tabular-nums">
-              Página {query.data.page} de{' '}
-              {Math.max(1, Math.ceil(query.data.total / query.data.limit))} · {query.data.total}{' '}
-              registros
-            </p>
-            <Button
-              variant="secondary"
-              disabled={
-                filters.page >= 1_000_000 || filters.page * query.data.limit >= query.data.total
-              }
-              onClick={() => void setFilters({ page: filters.page + 1 })}
-            >
-              Siguiente
-            </Button>
-          </nav>
+          <PaginationPage
+            label="Paginación del historial"
+            page={query.data.page}
+            total={query.data.total}
+            limit={query.data.limit}
+            previousDisabled={filters.page <= 1}
+            nextDisabled={
+              filters.page >= 1_000_000 || filters.page * query.data.limit >= query.data.total
+            }
+            onPreviousClick={() => void setFilters({ page: filters.page - 1 })}
+            onNextClick={() => void setFilters({ page: filters.page + 1 })}
+          />
         </>
       )}
     </div>

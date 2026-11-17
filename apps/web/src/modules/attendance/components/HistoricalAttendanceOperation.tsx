@@ -141,7 +141,10 @@ export function HistoricalAttendanceOperation({
         (correct && (record.version === 4294967295 || record.policyVersion !== 'personal-v1')) ? (
         <p>Este registro no admite esta operación.</p>
       ) : confirmation ? (
-        <section aria-label={`Confirmación de ${label.toLowerCase()}`} className="space-y-4">
+        <section
+          aria-label={`Confirmación de ${label.toLowerCase()}`}
+          className="space-y-4 rounded-md border bg-muted p-4"
+        >
           <p className="break-all">
             Registro {record.id} · versión {record.version} · {record.date} · {record.type} ·{' '}
             {record.observerName}
@@ -189,7 +192,7 @@ export function HistoricalAttendanceOperation({
         <form
           ref={formRef}
           noValidate
-          className="space-y-4"
+          className="space-y-6"
           onSubmit={(event) =>
             void handleSubmit(async (input) => {
               if (lock.current) return;
