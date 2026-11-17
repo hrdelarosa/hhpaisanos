@@ -16,6 +16,7 @@ import { ObserversLayout } from '../modules/observers/components/ObserversLayout
 import { UsersLayout } from '../modules/users/components/UsersLayout';
 import { AssignmentsLayout } from '../modules/assignments/components/AssignmentsLayout';
 import { AdministrativeAttendanceLayout } from '../modules/attendance/components/AdministrativeAttendanceLayout';
+import { PublicPage } from '../modules/auth/components/PublicPage';
 
 const OperativesListPage = lazy(() =>
   import('../modules/operatives/pages/OperativesListPage').then((m) => ({
@@ -107,7 +108,14 @@ export const routes: RouteObject[] = [
     element: <AppLayout />,
     children: [
       { path: 'login', element: <LoginPage /> },
-      { path: 'estado', element: <HealthPage /> },
+      {
+        path: 'estado',
+        element: (
+          <PublicPage>
+            <HealthPage />
+          </PublicPage>
+        ),
+      },
       {
         element: <RequireSession />,
         children: [
@@ -188,12 +196,14 @@ export const routes: RouteObject[] = [
       {
         path: '*',
         element: (
-          <section className="space-y-4">
-            <h1 className="text-heading font-semibold">Página no encontrada</h1>
-            <Link className="inline-flex min-h-touch items-center text-primary underline" to="/">
-              Volver al inicio
-            </Link>
-          </section>
+          <PublicPage>
+            <section className="space-y-4">
+              <h1 className="text-heading font-semibold">Página no encontrada</h1>
+              <Link className="inline-flex min-h-touch items-center text-primary underline" to="/">
+                Volver al inicio
+              </Link>
+            </section>
+          </PublicPage>
         ),
       },
     ],

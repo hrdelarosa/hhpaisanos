@@ -116,7 +116,7 @@ it('keeps navigation/logout usable while loading, then reuses the lazy module on
   expect(await screen.findByText('Cargando sección…')).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeTruthy();
   fireEvent.click(screen.getByRole('link', { name: 'Inicio' }));
-  await screen.findByRole('heading', { name: 'Sesión activa' });
+  await screen.findByRole('heading', { name: 'Inicio' });
   await act(async () => pending.resolve({ default: PrivatePage }));
   fireEvent.click(screen.getByRole('link', { name: 'Operativos' }));
   await screen.findByText('Contenido privado de Cuenta anterior');
@@ -144,9 +144,9 @@ it('handles rejected imports without exposing errors or retrying writes/imports,
   expect(screen.queryByText('synthetic-internal-error')).toBeNull();
   expect(window.location.pathname).toBe('/operativos');
   fireEvent.click(screen.getByRole('link', { name: 'Inicio' }));
-  await screen.findByRole('heading', { name: 'Sesión activa' });
+  await screen.findByRole('heading', { name: 'Inicio' });
   await waitFor(() =>
-    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Sesión activa' })),
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Inicio' })),
   );
   fireEvent.click(screen.getByRole('link', { name: 'Operativos' }));
   await screen.findByRole('heading', { name: 'No se pudo cargar esta sección' });
@@ -216,7 +216,7 @@ it.each([false, true])(
       target: { value: 'synthetic-password' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
-    await screen.findByRole('heading', { name: 'Sesión activa' });
+    await screen.findByRole('heading', { name: 'Inicio' });
     fireEvent.click(screen.getByRole('link', { name: 'Operativos' }));
     await screen.findByText('Cargando sección…');
     expect(fetchMock.mock.calls.some(([path]) => path === '/api/operatives')).toBe(false);

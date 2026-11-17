@@ -10,7 +10,7 @@ export function HealthPage() {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-heading font-semibold">Heroínas y Héroes Paisanos</h1>
+      <h1 className="text-heading font-semibold">Estado del servicio</h1>
       <p className="text-foreground-secondary">
         Base técnica del sistema de gestión operativa para Guerrero.
       </p>

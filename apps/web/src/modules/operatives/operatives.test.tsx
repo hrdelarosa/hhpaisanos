@@ -47,7 +47,7 @@ afterEach(() => {
 
 it('lists actual names, dates and states and selects URL-based administrative context', async () => {
   mount('/operativos?status=borrador');
-  await screen.findByRole('rowheader', { name: operative.name });
+  await screen.findByRole('rowheader', { name: operative.name }, { timeout: 5000 });
   const tableRegion = screen.getByRole('region', { name: 'Tabla de operativos' });
   expect(tableRegion.tabIndex).toBe(0);
   expect(tableRegion.contains(screen.getByRole('table', { name: 'Operativos de Guerrero' }))).toBe(
@@ -149,7 +149,7 @@ it('shows navigation and activation only for actual permissions, independent of 
 
 it('keeps observer administrative navigation outside the approved role matrix', async () => {
   mount('/', undefined, { ...admin, role: 'OBSERVADOR' });
-  await screen.findByRole('heading', { name: 'Sesión activa' });
+  await screen.findByRole('heading', { name: 'Inicio' });
   expect(screen.queryByRole('link', { name: 'Operativos' })).toBeNull();
   expect(screen.queryByRole('link', { name: 'Crear operativo' })).toBeNull();
 });

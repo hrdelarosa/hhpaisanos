@@ -1,108 +1,101 @@
 import { Link } from 'react-router';
+import { NavigationIcon } from '../../../components/ui/navigation-icon';
+import { cn } from '../../../lib/utils';
 import { useSession } from '../hooks/use-session';
-
-const sections = [
-  { label: 'Asistencia personal', permission: 'attendance:read-own', roles: ['OBSERVADOR'] },
-  {
-    label: 'Asistencias administrativas',
-    permission: 'attendance:read',
-    roles: ['ADMIN', 'ENLACE'],
-  },
-  { label: 'Operativos', permission: 'operatives:read', roles: ['ADMIN', 'ENLACE'] },
-  {
-    label: 'Crear operativo',
-    permission: 'operatives:create',
-    roles: ['ADMIN', 'ENLACE'],
-  },
-  {
-    label: 'Módulos de atención',
-    permission: 'attention-modules:read',
-    roles: ['ADMIN', 'ENLACE'],
-  },
-  { label: 'Observadores', permission: 'observers:read', roles: ['ADMIN', 'ENLACE'] },
-  { label: 'Crear observador', permission: 'observers:create', roles: ['ADMIN', 'ENLACE'] },
-  { label: 'Crear módulo', permission: 'attention-modules:create', roles: ['ADMIN', 'ENLACE'] },
-  { label: 'Asignaciones', permission: 'assignments:read', roles: ['ADMIN', 'ENLACE'] },
-  { label: 'Crear asignación', permission: 'assignments:create', roles: ['ADMIN', 'ENLACE'] },
-  { label: 'Cuentas', permission: 'users:read', roles: ['ADMIN'] },
-  { label: 'Crear cuenta', permission: 'users:create', roles: ['ADMIN'] },
-];
+import { availableSections, sectionDestination } from '../utils/navigation';
 
 export function SessionHomePage() {
   const { user } = useSession();
-  const available = sections.filter(
-    (item) =>
-      user &&
-      (item.permission.startsWith('assignments:') || item.roles.includes(user.role)) &&
-      user.permissions.includes(item.permission),
-  );
+  const sections = availableSections(user);
+  const groups = [...new Set(sections.map((section) => section.group))];
   return (
-    <section className="space-y-4">
-      <h1 className="text-heading">Sesión activa</h1>
-      <p>Ámbito operativo: Guerrero.</p>
-      <nav aria-label="Secciones autorizadas" className="space-y-4">
-        <h2 className="text-heading-sm">Accesos según tus permisos</h2>
-        <p className="text-foreground-secondary">
-          Las secciones marcadas como próximas aún no están disponibles.
+    <div className="flex flex-col gap-8">
+      <header className="flex flex-col gap-3 border-b pb-6">
+        <h1 className="text-heading">Inicio</h1>
+        <p className="text-subheading">
+          {user?.fullName} · {user?.role}
         </p>
-        {available.length ? (
-          <ul className="space-y-2">
-            {available.map((item) => (
-              <li key={item.permission}>
-                {[
-                  'attendance:read-own',
-                  'attendance:read',
-                  'operatives:read',
-                  'operatives:create',
-                  'attention-modules:read',
-                  'attention-modules:create',
-                  'observers:read',
-                  'observers:create',
-                  'users:read',
-                  'users:create',
-                  'assignments:read',
-                  'assignments:create',
-                ].includes(item.permission) ? (
-                  <Link
-                    className="inline-flex min-h-touch items-center text-primary underline"
-                    to={
-                      item.permission === 'attendance:read'
-                        ? '/asistencias'
-                        : item.permission === 'assignments:read'
-                          ? '/asignaciones'
-                          : item.permission === 'assignments:create'
-                            ? '/asignaciones/nueva'
-                            : item.permission === 'users:read'
-                              ? '/cuentas'
-                              : item.permission === 'users:create'
-                                ? '/cuentas/nueva'
-                                : item.permission === 'observers:read'
-                                  ? '/observadores'
-                                  : item.permission === 'observers:create'
-                                    ? '/observadores/nuevo'
-                                    : item.permission === 'attention-modules:read'
-                                      ? '/modulos'
-                                      : item.permission === 'attention-modules:create'
-                                        ? '/modulos/nuevo'
-                                        : item.permission === 'operatives:read'
-                                          ? '/operativos'
-                                          : item.permission === 'operatives:create'
-                                            ? '/operativos/nuevo'
-                                            : '/mi-asistencia'
-                    }
-                  >
-                    {item.label}
-                  </Link>
-                ) : (
-                  <span aria-disabled="true">{item.label} · Próximamente</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No tienes permisos de consulta para las secciones operativas.</p>
+        <p className="max-w-form text-foreground-secondary">
+          Bienvenido a tu espacio de trabajo. Elige una herramienta para continuar.
+        </p>
+        <p className="text-body-sm text-muted-foreground">Ámbito operativo: Guerrero.</p>
+      </header>
+      <nav aria-label="Secciones autorizadas" className="grid gap-8 lg:grid-cols-2">
+        {groups.map((group) => (
+          <section
+            key={group}
+            className={cn(
+              'flex min-w-0 flex-col gap-4',
+              (group === 'Operación' || group === 'Mi asistencia') && 'lg:col-span-2',
+            )}
+          >
+            <h2 className="text-heading-sm">{group}</h2>
+            <div className={cn('grid gap-4', group === 'Operación' && 'md:grid-cols-2')}>
+              {sections
+                .filter((section) => section.group === group)
+                .map((section) => {
+                  const destination = sectionDestination(section);
+                  return (
+                    <article
+                      key={section.id}
+                      className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-6"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="rounded-md bg-secondary p-3 text-secondary-foreground">
+                          <NavigationIcon name={section.icon} />
+                        </span>
+                        <h3 className="text-subheading">{section.label}</h3>
+                      </div>
+                      <p className="flex-1 text-body-sm text-foreground-secondary">
+                        {section.canRead
+                          ? section.description
+                          : 'Tienes acceso al registro de nuevos datos en esta sección.'}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-6">
+                        <Link
+                          to={destination.path}
+                          className="inline-flex min-h-touch items-center gap-3 text-label text-primary underline"
+                        >
+                          {section.canRead
+                            ? section.id === 'personal'
+                              ? 'Ver mi asistencia de hoy'
+                              : `Abrir ${section.label.toLocaleLowerCase('es')}`
+                            : destination.label}
+                          <NavigationIcon name="arrow" />
+                        </Link>
+                        {section.canRead && section.create && (
+                          <Link
+                            to={section.create.path}
+                            className="inline-flex min-h-touch items-center text-body-sm text-primary underline"
+                          >
+                            {section.create.label}
+                          </Link>
+                        )}
+                        {section.id === 'personal' && (
+                          <Link
+                            to="/mi-asistencia/historial"
+                            className="inline-flex min-h-touch items-center text-body-sm text-primary underline"
+                          >
+                            Consultar mi historial
+                          </Link>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+            </div>
+          </section>
+        ))}
+        {!sections.length && (
+          <section className="flex flex-col gap-2 rounded-lg border bg-card p-6 lg:col-span-2">
+            <h2 className="text-heading-sm">Sin herramientas disponibles</h2>
+            <p className="text-foreground-secondary">
+              No tienes permisos para las secciones operativas. Las acciones de tu cuenta siguen
+              disponibles en la navegación.
+            </p>
+          </section>
         )}
       </nav>
-    </section>
+    </div>
   );
 }

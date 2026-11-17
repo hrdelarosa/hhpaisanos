@@ -1,0 +1,193 @@
+// Run with installed Playwright CLI against the built web preview; all API data is synthetic.
+// No API server/database is needed or contacted. No capture/geolocation is performed.
+async function checkApplicationShell(page) {
+  const origin = new URL(page.url()).origin;
+  const assert = (value, message) => { if (!value) throw new Error(message); };
+  const admin = { id: 'd2-admin', username: 'synthetic-admin', fullName: 'Cuenta sintética ADMIN', role: 'ADMIN', mustChangePassword: false, permissions: ['operatives:read', 'operatives:create', 'attention-modules:read', 'observers:read', 'assignments:read', 'attendance:read', 'users:read'] };
+  const observer = { ...admin, id: 'd2-observer', username: 'synthetic-observer', fullName: 'Cuenta sintética OBSERVADOR', role: 'OBSERVADOR', permissions: ['attendance:read-own'] };
+  let current = null, nextLogin = admin, logoutFails = false, meFails = false;
+  const requests = [], results = [];
+  await page.unrouteAll();
+  await page.route(origin + '/api/**', route => {
+    const request = route.request(), path = new URL(request.url()).pathname;
+    requests.push({ path, method: request.method() });
+    if (path === '/api/auth/me') return route.fulfill(meFails ? { status: 503, json: {} } : current ? { json: current } : { status: 401, json: {} });
+    if (path === '/api/auth/login') { current = nextLogin; return route.fulfill({ json: { authenticated: true } }); }
+    if (path === '/api/auth/logout') { if (logoutFails) return route.fulfill({ status: 503, json: {} }); current = null; return route.fulfill({ status: 204 }); }
+    if (path === '/api/auth/change-password') { current = null; return route.fulfill({ status: 204 }); }
+    if (path === '/api/health') return route.fulfill({ json: { status: 'ok' } });
+    if (path === '/api/operatives') return route.fulfill({ json: { items: [{ id: '01950000-0000-7000-8000-000000000001', name: 'Operativo sintético ' + 'NombreLargo'.repeat(8), startDate: '2026-11-01', endDate: '2026-12-31', status: 'activo', arrivalToleranceMinutes: 10, createdAt: '2026-11-01T12:00:00Z', updatedAt: '2026-11-01T12:00:00Z' }], page: 1, limit: 20, total: 1 } });
+    throw new Error('Unexpected API request: ' + path);
+  });
+  const heading = name => page.getByRole('heading', { name, exact: true });
+  const toggle = () => page.getByRole('button', { name: 'Alternar navegación', exact: true });
+  const panel = () => page.getByRole('dialog', { name: 'Navegación', exact: true });
+  const checkPage = async label => {
+    const dimensions = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth, mains: document.querySelectorAll('main').length }));
+    assert(dimensions.scroll <= dimensions.client + 1, label + ': global overflow');
+    assert(dimensions.mains === 1, label + ': main landmark');
+    results.push({ label, ...dimensions });
+  };
+  const go = async (path, title) => { await page.goto(origin + path); await heading(title).waitFor(); };
+  const login = async () => {
+    await page.getByLabel('Usuario', { exact: true }).fill('synthetic-user');
+    await page.getByLabel('Contraseña', { exact: true }).fill('synthetic-password');
+    await page.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
+  };
+
+  // Login, home and desktop controls; no decoration-only requests.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await go('/login', 'Iniciar sesión');
+  await login();
+  await heading('Inicio').waitFor();
+  assert(requests.every(request => request.path.startsWith('/api/auth/')), 'Home fetched decorative data');
+  await page.evaluate(() => { window.d2Main = document.querySelector('main'); });
+  await toggle().click();
+  assert(await toggle().getAttribute('aria-expanded') === 'false', 'Desktop sidebar did not hide');
+  await toggle().click();
+  assert(await page.evaluate(() => window.d2Main === document.querySelector('main')), 'Sidebar toggle remounted route content');
+  await checkPage('ADMIN desktop');
+
+  // Each narrow viewport starts closed; keyboard open, Escape, close, route focus and breakpoint exits.
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    await go('/', 'Inicio');
+    assert(await toggle().getAttribute('aria-expanded') === 'false', 'Mobile navigation not initially closed');
+    await toggle().focus(); await page.keyboard.press('Enter');
+    await panel().waitFor();
+    await panel().getByRole('button', { name: 'Cerrar navegación' }).focus();
+    await page.keyboard.press('Shift+Tab');
+    assert(await panel().evaluate(el => el === document.activeElement || el.contains(document.activeElement)), 'Modal keyboard containment');
+    await page.keyboard.press('Tab');
+    assert(await panel().getByRole('button', { name: 'Cerrar navegación' }).evaluate(el => document.activeElement === el), 'Modal keyboard wrap');
+    await page.keyboard.press('Escape');
+    await panel().waitFor({ state: 'hidden' });
+    assert(await toggle().evaluate(el => document.activeElement === el), 'Escape focus restoration');
+    await toggle().click();
+    await panel().getByRole('button', { name: 'Cerrar navegación' }).click();
+    assert(await toggle().evaluate(el => document.activeElement === el), 'Close focus restoration');
+    if (width === 390) {
+      const box = await toggle().boundingBox();
+      const touch = await page.context().newCDPSession(page);
+      try {
+        await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }] });
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await panel().waitFor();
+        await page.keyboard.press('Escape');
+      } finally {
+        await touch.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+        await touch.detach();
+      }
+    }
+    await toggle().click();
+    await panel().getByRole('link', { name: 'Operativos', exact: true }).click();
+    await page.getByRole('table').waitFor();
+    assert(await heading('Operativos').evaluate(el => document.activeElement === el), 'Menu navigation lost Q2B route focus');
+    await checkPage('Operatives ' + width);
+    const region = page.getByRole('region', { name: 'Tabla de operativos', exact: true });
+    await region.focus();
+    assert(await region.evaluate(el => parseFloat(getComputedStyle(el).outlineWidth) >= 2), 'Q2A table focus');
+    if (await region.evaluate(el => el.scrollWidth > el.clientWidth)) {
+      await page.keyboard.press('ArrowRight');
+      await page.waitForFunction(() => document.querySelector('[aria-label="Tabla de operativos"]').scrollLeft > 0);
+    }
+    await toggle().click();
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await panel().waitFor({ state: 'hidden' });
+    assert(await toggle().evaluate(el => document.activeElement === el), 'Breakpoint focus restoration');
+    const sidebarLink = page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('link', { name: 'Inicio', exact: true });
+    await sidebarLink.focus();
+    await page.setViewportSize({ width, height: 844 });
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Alternar navegación');
+    await checkPage('Mobile after breakpoint ' + width);
+  }
+
+  // Role matrix and long-content resilience on the home screen.
+  for (const account of [admin, { ...admin, role: 'ENLACE', fullName: 'Cuenta sintética ENLACE' }, observer, { ...admin, fullName: 'Nombre'.repeat(35), permissions: [] }]) {
+    current = account;
+    for (const width of [320, 390, 768, 1280]) {
+      await page.setViewportSize({ width, height: 844 });
+      await go('/', 'Inicio');
+      await checkPage(account.role + ' home ' + width);
+      const home = page.getByRole('navigation', { name: 'Secciones autorizadas' });
+      if (account.role === 'ENLACE') assert(await home.locator('a[href="/cuentas"]').count() === 0, 'ENLACE accounts bypass');
+      if (account.role === 'OBSERVADOR') assert(await home.locator('a[href="/mi-asistencia"]').count() === 1 && await home.locator('a[href="/operativos"]').count() === 0, 'Observer priorities');
+      if (!account.permissions.length) assert(await home.getByRole('heading', { name: 'Sin herramientas disponibles' }).count() === 1, 'ADMIN implicit bypass');
+    }
+  }
+
+  // Create-only link and breadcrumb must not expose the unreadable list.
+  current = { ...admin, permissions: ['operatives:create'] };
+  await go('/', 'Inicio');
+  await page.getByRole('navigation', { name: 'Secciones autorizadas' }).getByRole('link', { name: 'Crear operativo' }).click();
+  await heading('Crear operativo').waitFor();
+  assert(await page.getByRole('navigation', { name: 'Ubicación' }).locator('a[href="/operativos"]').count() === 0, 'Create-only breadcrumb leaks unreadable list');
+  current = { ...observer, permissions: ['assignments:create'] };
+  await go('/', 'Inicio');
+  assert(await page.getByRole('navigation', { name: 'Secciones autorizadas' }).locator('a[href="/asignaciones/nueva"]').count() === 1, 'Assignments exception lost');
+  current = { ...admin, permissions: [] };
+  const listReads = requests.filter(request => request.path === '/api/operatives').length;
+  await page.goto(origin + '/operativos');
+  await page.getByRole('alert').filter({ hasText: 'No tienes permiso' }).waitFor();
+  assert(await page.getByRole('navigation', { name: 'Ubicación' }).getByText('Operativos', { exact: true }).count() === 1, 'Denied route lost breadcrumb context');
+  assert(requests.filter(request => request.path === '/api/operatives').length === listReads, 'Denied route fetched private data');
+
+  // Mandatory and voluntary password screens preserve their restrictions and session outcome.
+  current = { ...observer, mustChangePassword: true };
+  await go('/', 'Cambiar contraseña');
+  assert(await page.getByRole('navigation', { name: 'Navegación principal' }).count() === 0 && await page.getByRole('link', { name: 'Volver al inicio' }).count() === 0, 'Mandatory password bypass');
+  await page.getByLabel('Contraseña actual', { exact: true }).fill('synthetic-old');
+  await page.getByLabel('Nueva contraseña (15 a 128 caracteres)', { exact: true }).fill('synthetic-new-password');
+  await page.getByLabel('Confirmar nueva contraseña', { exact: true }).fill('synthetic-new-password');
+  await page.getByRole('button', { name: 'Actualizar contraseña', exact: true }).click();
+  await heading('Iniciar sesión').waitFor();
+  current = admin;
+  await go('/cambiar-contrasena', 'Cambiar contraseña');
+  assert(await page.getByRole('link', { name: 'Volver al inicio' }).count() === 1, 'Voluntary password return lost');
+
+  // Unknown logout, explicit retry and a different identity must not retain private content.
+  await go('/', 'Inicio');
+  logoutFails = true;
+  await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click();
+  await heading('Cierre de sesión sin confirmar').waitFor();
+  assert(await page.getByText(admin.fullName, { exact: true }).count() === 0, 'Private identity retained after logout');
+  logoutFails = false;
+  await page.getByRole('button', { name: 'Reintentar cierre de sesión' }).click();
+  await heading('Iniciar sesión').waitFor();
+  nextLogin = observer;
+  await login();
+  await heading('Inicio').waitFor();
+  assert(await page.getByText(admin.fullName, { exact: true }).count() === 0, 'Old identity leaked after login');
+  current = null;
+  await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')));
+  await heading('Iniciar sesión').waitFor();
+  meFails = true;
+  await go('/', 'No se pudo verificar la sesión');
+  meFails = false; current = admin;
+  await page.getByRole('button', { name: 'Volver a verificar' }).click();
+  await heading('Inicio').waitFor();
+
+  // A rejected lazy chunk leaves the shell and account actions operational.
+  await page.route('**/assets/OperativesListPage-*.js', route => route.abort());
+  await go('/', 'Inicio');
+  await page.getByRole('complementary', { name: 'Barra lateral' }).getByRole('link', { name: 'Operativos', exact: true }).click();
+  await heading('No se pudo cargar esta sección').waitFor();
+  assert(await heading('No se pudo cargar esta sección').evaluate(el => document.activeElement === el), 'Lazy-error route focus');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await toggle().click();
+  await panel().getByRole('link', { name: 'Inicio', exact: true }).click();
+  await heading('Inicio').waitFor();
+  await toggle().click();
+  await panel().getByRole('link', { name: 'Operativos', exact: true }).click();
+  await heading('No se pudo cargar esta sección').waitFor();
+  await toggle().click();
+  await panel().getByRole('button', { name: 'Cerrar sesión', exact: true }).click();
+  await heading('Iniciar sesión').waitFor();
+  await page.unroute('**/assets/OperativesListPage-*.js');
+  await go('/no-existe', 'Página no encontrada');
+  await go('/estado', 'Estado del servicio');
+  await page.getByText('API conectada.', { exact: true }).waitFor();
+  assert(!requests.some(request => request.path.includes('/attendance')), 'Shell checks unexpectedly touched capture');
+  return { checks: results, requests: requests.length, scope: 'synthetic browser responses; no real API/DB' };
+}

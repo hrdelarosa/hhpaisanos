@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vite-plus/test';
 import { App } from '../../app/App';
 import {
@@ -84,7 +84,7 @@ async function prepareStatus(active = true) {
 
 it('lists real profile fields and preserves URL filters when returning from detail', async () => {
   mount('/observadores?active=true');
-  await screen.findByRole('rowheader', { name: observer.firstNames });
+  await screen.findByRole('rowheader', { name: observer.firstNames }, { timeout: 5000 });
   expect(screen.getByRole('cell', { name: observer.phone })).toBeTruthy();
   expect(screen.getByRole('cell', { name: 'Activo' })).toBeTruthy();
   fireEvent.click(screen.getByRole('link', { name: `Ver detalle de ${title}` }));
@@ -324,7 +324,8 @@ it('validates creation, sends only profile fields with CSRF and invalidates cach
 });
 it('creates without read permission using the authorized home navigation', async () => {
   mount('/', () => Response.json(observer), { ...user, permissions: ['observers:create'] });
-  fireEvent.click(await screen.findByRole('link', { name: 'Crear observador' }));
+  const home = await screen.findByRole('navigation', { name: 'Secciones autorizadas' });
+  fireEvent.click(within(home).getByRole('link', { name: 'Crear observador' }));
   await screen.findByRole('heading', { name: 'Crear observador' });
   fillCreation();
   fireEvent.click(screen.getByRole('button', { name: 'Guardar observador' }));

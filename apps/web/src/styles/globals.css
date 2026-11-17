@@ -151,3 +151,23 @@
     outline-offset: 2px;
   }
 }
+
+/* Native navigation dialogs retain their closed display state and modal behavior. */
+.app-sidebar[hidden] {
+  display: none;
+}
+
+.mobile-navigation:modal {
+  overscroll-behavior: contain;
+}
+
+.mobile-navigation::backdrop {
+  background: var(--foreground);
+  opacity: 0.45;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+:is(.app-sidebar, .mobile-navigation) a:not([aria-current]):focus-visible {
+  outline-color: var(--focus-inverse);
+}
