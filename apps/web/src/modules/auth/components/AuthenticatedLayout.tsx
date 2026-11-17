@@ -1,118 +1,87 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Outlet, useLocation } from 'react-router';
+import { useRef, type ReactNode } from 'react';
+import { Link, Outlet, useLocation } from 'react-router';
 import { RouteContentBoundary } from '../../../app/RouteContentBoundary';
-import { Brand } from '../../../components/Brand';
 import { Button } from '../../../components/ui/button';
-import { NavigationIcon } from '../../../components/ui/navigation-icon';
+import {
+  Sidebar,
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from '../../../components/ui/sidebar';
 import { useSession } from '../hooks/use-session';
 import { AppNavigation } from './AppNavigation';
 import { SiteBreadcrumbs } from './SiteBreadcrumbs';
 
 export function AuthenticatedLayout({ children }: { children?: ReactNode }) {
-  const { user } = useSession();
+  const session = useSession();
   const { pathname } = useLocation();
-  const [desktopOpen, setDesktopOpen] = useState(true);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [wide, setWide] = useState(
-    () => window.matchMedia?.('(min-width: 1024px)').matches ?? true,
-  );
-  const trigger = useRef<HTMLButtonElement>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const sidebar = useRef<HTMLElement>(null);
-  const sidebarHadFocus = useRef(false);
+  const accountMenu = useRef<HTMLDetailsElement>(null);
+  const user = session.user;
+  const initials =
+    user?.fullName
+      .trim()
+      .split(/\s+/u)
+      .slice(0, 2)
+      .map((part) => Array.from(part)[0])
+      .join('') ?? '';
 
-  useEffect(() => {
-    const media = window.matchMedia?.('(min-width: 1024px)');
-    if (!media) return;
-    const change = () => {
-      dialog.current?.close();
-      setMobileOpen(false);
-      // CSS can hide the focused link (leaving body focused) before matchMedia fires.
-      if (sidebarHadFocus.current) trigger.current?.focus();
-      setWide(media.matches);
-    };
-    media.addEventListener('change', change);
-    return () => media.removeEventListener('change', change);
-  }, []);
-
-  const closeMobile = () => dialog.current?.close();
   return (
-    <div
-      className="flex min-h-svh min-w-0"
-      onFocusCapture={(event) => {
-        sidebarHadFocus.current = sidebar.current?.contains(event.target) ?? false;
-      }}
-      onPointerDownCapture={(event) => {
-        if (event.target instanceof Node && !sidebar.current?.contains(event.target))
-          sidebarHadFocus.current = false;
-      }}
-    >
-      <aside
-        ref={sidebar}
-        id="desktop-navigation"
-        aria-label="Barra lateral"
-        hidden={!desktopOpen}
-        className="app-sidebar sticky top-0 hidden h-svh w-sidebar shrink-0 overflow-y-auto bg-primary-hover text-primary-foreground lg:block"
-      >
+    <SidebarProvider>
+      <Sidebar>
         <AppNavigation />
-      </aside>
-      <dialog
-        ref={dialog}
-        id="mobile-navigation"
-        aria-labelledby="mobile-navigation-title"
-        className="mobile-navigation m-0 h-svh max-h-none w-sidebar max-w-full border-0 bg-primary-hover p-0 text-primary-foreground"
-        onClose={() => setMobileOpen(false)}
-      >
-        <div className="flex items-center justify-between gap-2 px-4 pt-4">
-          <h2 id="mobile-navigation-title" className="text-subheading">
-            Navegación
-          </h2>
-          <Button variant="secondary" aria-label="Cerrar navegación" onClick={closeMobile}>
-            <NavigationIcon name="close" />
-          </Button>
-        </div>
-        <AppNavigation onNavigate={closeMobile} />
-      </dialog>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex min-h-16 flex-wrap items-center gap-3 border-b bg-card px-4 py-2 sm:px-6">
-          <Button
-            ref={trigger}
-            variant="secondary"
-            aria-label="Alternar navegación"
-            aria-expanded={wide ? desktopOpen : mobileOpen}
-            aria-controls={wide ? 'desktop-navigation' : 'mobile-navigation'}
-            onClick={() => {
-              if (wide) setDesktopOpen((open) => !open);
-              else {
-                dialog.current?.showModal();
-                setMobileOpen(true);
-              }
-            }}
-          >
-            <NavigationIcon name="menu" />
-          </Button>
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <span className="lg:hidden">
-              <Brand variant="compact" />
-            </span>
-            <SiteBreadcrumbs />
-          </div>
-          <div className="ml-auto flex min-w-0 items-center gap-3">
-            <span
-              aria-hidden="true"
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-label text-secondary-foreground"
-            >
-              {user?.fullName
-                .trim()
-                .split(/\s+/u)
-                .slice(0, 2)
-                .map((part) => Array.from(part)[0])
-                .join('')}
-            </span>
-            <div className="hidden max-w-64 flex-col text-body-sm sm:flex">
-              <p className="text-label">{user?.fullName}</p>
-              <p className="text-muted-foreground">{user?.role}</p>
+      </Sidebar>
+      <SidebarInset>
+        <header className="flex h-14 shrink-0 items-center border-b bg-card">
+          <div className="flex w-full min-w-0 items-center gap-2 px-4 sm:gap-3 sm:px-6">
+            <SidebarTrigger />
+            <span aria-hidden="true" className="h-7 w-px shrink-0 bg-border" />
+            <div className="min-w-0 flex-1">
+              <SiteBreadcrumbs />
             </div>
+            {user && (
+              <details ref={accountMenu} className="relative ml-auto shrink-0">
+                <summary
+                  aria-label={`Cuenta de ${user.fullName}, ${user.role}`}
+                  className="flex min-h-touch cursor-pointer list-none items-center gap-2 rounded-md px-2 hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary text-label text-secondary-foreground"
+                  >
+                    {initials}
+                  </span>
+                  <span className="hidden max-w-48 flex-col text-left text-body-sm sm:flex">
+                    <span className="truncate font-medium">{user.fullName}</span>
+                    <span className="truncate text-muted-foreground">{user.role}</span>
+                  </span>
+                </summary>
+                <nav
+                  aria-label="Acciones de cuenta"
+                  className="absolute right-0 top-full z-30 mt-2 flex w-56 flex-col gap-1 rounded-lg border bg-popover p-2 text-popover-foreground shadow-lg"
+                >
+                  <Link
+                    to="/cambiar-contrasena"
+                    className="flex min-h-touch items-center rounded-md px-3 text-label hover:bg-secondary"
+                    onClick={() => {
+                      if (accountMenu.current) accountMenu.current.open = false;
+                    }}
+                  >
+                    Cambiar contraseña
+                  </Link>
+                  <Button
+                    variant="secondary"
+                    className="w-full justify-start"
+                    disabled={session.busy}
+                    onClick={() => {
+                      if (accountMenu.current) accountMenu.current.open = false;
+                      void session.logout();
+                    }}
+                  >
+                    {session.busy ? 'Cerrando sesión…' : 'Cerrar sesión'}
+                  </Button>
+                </nav>
+              </details>
+            )}
           </div>
         </header>
         <main
@@ -123,7 +92,7 @@ export function AuthenticatedLayout({ children }: { children?: ReactNode }) {
         >
           <RouteContentBoundary pathname={pathname}>{children ?? <Outlet />}</RouteContentBoundary>
         </main>
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
