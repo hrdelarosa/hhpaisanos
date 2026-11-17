@@ -20,11 +20,14 @@ export function LoginPage() {
     return <Navigate to={session.user?.mustChangePassword ? '/cambiar-contrasena' : '/'} replace />;
   if (session.status !== 'anonymous') return <SessionStatus />;
   return (
-    <AuthFrame>
+    <AuthFrame variant="login">
       <header className="space-y-2">
+        <p className="text-caption font-medium tracking-wide text-muted-foreground">
+          Acceso institucional
+        </p>
         <h1 className="text-heading">Iniciar sesión</h1>
         <p className="text-body-sm text-foreground-secondary">
-          Accede con la cuenta asignada para consultar tus herramientas de trabajo.
+          Usa las credenciales asignadas por el administrador del sistema.
         </p>
       </header>
       {session.notice && <output className="block">{session.notice}</output>}
@@ -67,7 +70,12 @@ export function LoginPage() {
           {session.busy ? 'Iniciando sesión…' : 'Iniciar sesión'}
         </Button>
       </form>
-      <Button variant="secondary" disabled={session.busy} onClick={session.recheck}>
+      <Button
+        variant="secondary"
+        className="mx-auto min-h-0 bg-transparent px-2 py-1 text-body-sm text-foreground-secondary hover:bg-secondary"
+        disabled={session.busy}
+        onClick={session.recheck}
+      >
         Verificar sesión existente
       </Button>
     </AuthFrame>
