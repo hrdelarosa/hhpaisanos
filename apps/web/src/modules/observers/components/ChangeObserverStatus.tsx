@@ -51,7 +51,10 @@ export function ChangeObserverStatus({ observer }: { observer: Observer }) {
       <h2 className="text-heading-sm">Estado del perfil</h2>
       {notice && <p role={mutation.isSuccess ? 'status' : 'alert'}>{notice}</p>}
       {confirmation ? (
-        <section aria-labelledby="status-confirm-title" className="space-y-4">
+        <section
+          aria-labelledby="status-confirm-title"
+          className="space-y-4 rounded-md border bg-muted p-4"
+        >
           <h3 id="status-confirm-title" className="text-subheading">
             Confirmar {confirmation.observer.active ? 'desactivación' : 'activación'}
           </h3>

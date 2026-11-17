@@ -7,8 +7,8 @@ export function ObserversLayout() {
   if (!user?.permissions.includes(creating ? 'observers:create' : 'observers:read'))
     return <p role="alert">No tienes permiso para esta sección de observadores.</p>;
   return (
-    <section className="space-y-6">
-      <nav aria-label="Observadores" className="flex flex-wrap gap-4">
+    <section className="min-w-0 space-y-6">
+      <nav aria-label="Observadores" className="flex flex-wrap gap-4 text-body-sm">
         {user.permissions.includes('observers:read') && (
           <Link
             className="inline-flex min-h-touch items-center text-primary underline"
@@ -26,10 +26,10 @@ export function ObserversLayout() {
           </Link>
         )}
       </nav>
-      <p className="text-foreground-secondary">
+      <Outlet />
+      <p className="border-t pt-4 text-body-sm text-muted-foreground">
         Ámbito administrativo: Guerrero. Sin aislamiento por oficina.
       </p>
-      <Outlet />
     </section>
   );
 }

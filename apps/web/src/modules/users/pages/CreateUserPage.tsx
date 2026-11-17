@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
 import { Button } from '../../../components/ui/button';
+import { PageHeader } from '../../../components/page-header';
+import { StatusBadge } from '../../../components/status-badge';
 import { HttpError } from '../../../lib/http';
 import { useSession } from '../../auth/hooks/use-session';
 import { ObserverField } from '../../observers/components/ObserverField';
@@ -48,8 +50,12 @@ export function CreateUserPage() {
     );
   if (created)
     return (
-      <section className="max-w-form space-y-4 rounded-lg border bg-card p-4 sm:p-6">
-        <h1 className="text-heading">Cuenta creada</h1>
+      <section className="max-w-form space-y-6 rounded-lg border bg-card p-4 sm:p-6">
+        <PageHeader
+          title="Cuenta creada"
+          description="Creación confirmada por el servidor."
+          actions={<StatusBadge label="Activa" tone="success" />}
+        />
         <output className="block">
           Creación confirmada por el servidor. Entrega la credencial una sola vez mediante un canal
           autorizado.
@@ -99,12 +105,10 @@ export function CreateUserPage() {
   );
   return (
     <section className="max-w-form space-y-4">
-      <h1 className="text-heading">Crear cuenta</h1>
-      <p>
-        Usuario inmutable. Solo se admiten roles ENLACE u OBSERVADOR activos como clasificación
-        inicial, sin editar roles o permisos. La contraseña temporal se mostrará una sola vez y
-        exige cambio por su titular.
-      </p>
+      <PageHeader
+        title="Crear cuenta"
+        description="La contraseña temporal se muestra una sola vez y exige cambio por su titular."
+      />
       {notice && <p role="alert">{notice}</p>}
       {uncertain && (
         <p role="alert">
@@ -115,7 +119,7 @@ export function CreateUserPage() {
       {!assignable.length && <p role="alert">No hay roles activos asignables.</p>}
       <form
         noValidate
-        className="space-y-4"
+        className="space-y-6 rounded-lg border bg-card p-4 sm:p-6"
         onSubmit={(event) => {
           void handleSubmit(async (input) => {
             if (busy.current || uncertain) return;
@@ -139,40 +143,47 @@ export function CreateUserPage() {
           })(event);
         }}
       >
-        <ObserverField
-          id="username"
-          label="Nombre de usuario"
-          error={errors.username?.message}
-          disabled={pending || uncertain}
-          {...register('username')}
-        />
-        <ObserverField
-          id="fullName"
-          label="Nombre completo de la cuenta"
-          error={errors.fullName?.message}
-          disabled={pending || uncertain}
-          {...register('fullName')}
-        />
-        <label className="block space-y-2" htmlFor="initial-role">
-          Rol inicial
-          <select
-            id="initial-role"
-            className="min-h-touch w-full rounded-md border border-input bg-card px-3"
+        <fieldset className="grid min-w-0 gap-4 sm:grid-cols-2">
+          <legend className="mb-4 text-subheading">Datos de acceso</legend>
+          <ObserverField
+            id="username"
+            label="Nombre de usuario"
+            error={errors.username?.message}
             disabled={pending || uncertain}
-            {...register('roleId')}
-          >
-            <option value="">Selecciona un rol</option>
-            {assignable.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.code}
-              </option>
-            ))}
-          </select>
-        </label>
-        {errors.roleId && <p role="alert">{errors.roleId.message}</p>}
-        <Button type="submit" disabled={pending || uncertain || !assignable.length}>
-          {pending ? 'Creando…' : 'Crear cuenta'}
-        </Button>
+            {...register('username')}
+          />
+          <ObserverField
+            id="fullName"
+            label="Nombre completo de la cuenta"
+            error={errors.fullName?.message}
+            disabled={pending || uncertain}
+            {...register('fullName')}
+          />
+          <div className="space-y-2 sm:col-span-2">
+            <label className="block space-y-2" htmlFor="initial-role">
+              Rol inicial
+              <select
+                id="initial-role"
+                className="min-h-touch w-full rounded-md border border-input bg-card px-3"
+                disabled={pending || uncertain}
+                {...register('roleId')}
+              >
+                <option value="">Selecciona un rol</option>
+                {assignable.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.code}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {errors.roleId && <p role="alert">{errors.roleId.message}</p>}
+          </div>
+        </fieldset>
+        <div className="flex justify-end border-t pt-4">
+          <Button type="submit" disabled={pending || uncertain || !assignable.length}>
+            {pending ? 'Creando…' : 'Crear cuenta'}
+          </Button>
+        </div>
       </form>
     </section>
   );

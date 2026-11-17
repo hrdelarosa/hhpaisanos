@@ -97,6 +97,11 @@ it('redirects anonymous protected navigation and logs in with JSON/CSRF then rer
   await screen.findByRole('heading', { name: 'Iniciar sesión' });
   expect(window.location.pathname).toBe('/login');
   await expectHeadingFocus('Iniciar sesión');
+  const password = screen.getByLabelText('Contraseña') as HTMLInputElement;
+  fireEvent.click(screen.getByRole('button', { name: 'Mostrar contraseña' }));
+  expect(password.type).toBe('text');
+  fireEvent.click(screen.getByRole('button', { name: 'Ocultar contraseña' }));
+  expect(password.type).toBe('password');
   submitLogin();
   await screen.findByRole('heading', { name: 'Inicio' });
   const [, options] = fetchMock.mock.calls.find(([path]) => path === '/api/auth/login')!;

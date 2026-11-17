@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import { Button } from '../../../components/ui/button';
+import { PageHeader } from '../../../components/page-header';
 import { useSession } from '../../auth/hooks/use-session';
 import { createObserver, observersKey } from '../api/observers';
 import { ObserverField } from '../components/ObserverField';
@@ -39,13 +40,12 @@ export function CreateObserverPage() {
     },
   });
   return (
-    <section className="max-w-form space-y-4 rounded-lg border bg-card p-4 sm:p-6">
-      <h1 className="text-heading">Crear observador</h1>
-      <p>
-        Se crea un perfil activo, sin cuenta vinculada ni asignaciones. No se crea una cuenta de
-        acceso. El estado, identificador y fechas los controla el servidor.
-      </p>
-      <p>
+    <section className="max-w-form space-y-6">
+      <PageHeader
+        title="Crear observador"
+        description="Se crea un perfil activo, sin cuenta vinculada ni asignaciones. No se crea una cuenta de acceso."
+      />
+      <p className="text-body-sm text-muted-foreground">
         Los nombres y teléfonos no son únicos. Revisa el listado antes de crear otro perfil de la
         misma persona.
       </p>
@@ -70,36 +70,43 @@ export function CreateObserverPage() {
       )}
       <form
         noValidate
-        className="space-y-4"
+        className="space-y-6 rounded-lg border bg-card p-4 sm:p-6"
         onSubmit={handleSubmit((input) => {
           if (!mutation.isPending && !uncertain) mutation.mutate(input);
         })}
       >
-        <ObserverField
-          id="observer-firstNames"
-          label="Nombres"
-          error={errors.firstNames?.message}
-          disabled={mutation.isPending}
-          {...register('firstNames')}
-        />
-        <ObserverField
-          id="observer-lastNames"
-          label="Apellidos"
-          error={errors.lastNames?.message}
-          disabled={mutation.isPending}
-          {...register('lastNames')}
-        />
-        <ObserverField
-          id="observer-phone"
-          label="Teléfono (opcional)"
-          type="tel"
-          error={errors.phone?.message}
-          disabled={mutation.isPending}
-          {...register('phone')}
-        />
-        <Button type="submit" disabled={mutation.isPending || uncertain}>
-          {mutation.isPending ? 'Creando…' : 'Guardar observador'}
-        </Button>
+        <fieldset className="grid min-w-0 gap-4 sm:grid-cols-2">
+          <legend className="mb-4 text-subheading">Datos del perfil</legend>
+          <ObserverField
+            id="observer-firstNames"
+            label="Nombres"
+            error={errors.firstNames?.message}
+            disabled={mutation.isPending}
+            {...register('firstNames')}
+          />
+          <div className="space-y-4 sm:col-span-2">
+            <ObserverField
+              id="observer-lastNames"
+              label="Apellidos"
+              error={errors.lastNames?.message}
+              disabled={mutation.isPending}
+              {...register('lastNames')}
+            />
+            <ObserverField
+              id="observer-phone"
+              label="Teléfono (opcional)"
+              type="tel"
+              error={errors.phone?.message}
+              disabled={mutation.isPending}
+              {...register('phone')}
+            />
+          </div>
+        </fieldset>
+        <div className="flex justify-end border-t pt-4">
+          <Button type="submit" disabled={mutation.isPending || uncertain}>
+            {mutation.isPending ? 'Creando…' : 'Guardar observador'}
+          </Button>
+        </div>
       </form>
     </section>
   );

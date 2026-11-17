@@ -95,7 +95,10 @@ export function ManageUser({
           Cargar datos actuales para {operation === 'edit' ? 'edición' : 'estado'}
         </Button>
       ) : confirmation ? (
-        <section className="space-y-4" aria-label="Confirmación de cuenta">
+        <section
+          className="space-y-4 rounded-md border bg-muted p-4"
+          aria-label="Confirmación de cuenta"
+        >
           <h3 className="text-subheading">Revisar cambio de cuenta</h3>
           <p className="break-words">
             Usuario: {confirmation.account.username}.{' '}
@@ -136,7 +139,7 @@ export function ManageUser({
       ) : (
         <form
           noValidate
-          className="space-y-4"
+          className="space-y-6"
           onSubmit={(event) => {
             void handleSubmit(async (input) => {
               if (lock.current) return;
@@ -179,13 +182,15 @@ export function ManageUser({
             disabled={preparing}
             {...register('reason')}
           />
-          <Button variant="secondary" type="submit" disabled={preparing}>
-            {operation === 'edit'
-              ? 'Revisar edición de cuenta'
-              : account.active
-                ? 'Revisar desactivación de cuenta'
-                : 'Revisar activación de cuenta'}
-          </Button>
+          <div className="flex justify-end border-t pt-4">
+            <Button variant="secondary" type="submit" disabled={preparing}>
+              {operation === 'edit'
+                ? 'Revisar edición de cuenta'
+                : account.active
+                  ? 'Revisar desactivación de cuenta'
+                  : 'Revisar activación de cuenta'}
+            </Button>
+          </div>
         </form>
       )}
     </section>

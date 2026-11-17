@@ -2,16 +2,65 @@ import { useQuery } from '@tanstack/react-query';
 import { createParser, parseAsString, parseAsStringEnum, useQueryStates } from 'nuqs';
 import { Link, useLocation } from 'react-router';
 import { z } from 'zod';
+import { DataTable, type DataTableColumn } from '../../../components/data-table';
+import { PageHeader } from '../../../components/page-header';
+import { PaginationPage } from '../../../components/pagination-page';
+import { StatusBadge } from '../../../components/status-badge';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { listUsers, usersKey } from '../api/users';
+import type { UserAccount } from '../schemas/users';
 import { userError } from '../utils/feedback';
 
 const integer = (max: number) =>
   createParser({
-    parse: (v) => (/^\d{1,8}$/.test(v) && Number(v) >= 1 && Number(v) <= max ? Number(v) : null),
+    parse: (value) =>
+      /^\d{1,8}$/.test(value) && Number(value) >= 1 && Number(value) <= max ? Number(value) : null,
     serialize: String,
   });
+
+const columns: DataTableColumn<UserAccount>[] = [
+  {
+    key: 'username',
+    header: 'Usuario',
+    rowHeader: true,
+    cellClassName: 'min-w-40 whitespace-pre-wrap',
+    render: (account) => account.username,
+  },
+  {
+    key: 'name',
+    header: 'Nombre',
+    cellClassName: 'min-w-56 whitespace-pre-wrap',
+    render: (account) => account.fullName,
+  },
+  {
+    key: 'role',
+    header: 'Rol',
+    cellClassName: 'whitespace-nowrap',
+    render: (account) => account.role,
+  },
+  {
+    key: 'active',
+    header: 'Estado',
+    render: (account) => (
+      <StatusBadge
+        label={account.active ? 'Activa' : 'Inactiva'}
+        tone={account.active ? 'success' : 'neutral'}
+      />
+    ),
+  },
+  {
+    key: 'password',
+    header: 'Cambio de contraseña',
+    render: (account) => (
+      <StatusBadge
+        label={account.mustChangePassword ? 'Requerido' : 'No requerido'}
+        tone={account.mustChangePassword ? 'warning' : 'neutral'}
+      />
+    ),
+  },
+];
+
 export function UsersListPage() {
   const [filters, setFilters] = useQueryStates(
     {
@@ -33,150 +82,110 @@ export function UsersListPage() {
     enabled: valid,
   });
   return (
-    <div className="space-y-4">
-      <h1 className="text-heading">Cuentas de usuario</h1>
-      <p>
-        Orden: creación e identificador ascendentes. El estado de la cuenta no es el estado del
-        perfil de observador.
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="space-y-2" htmlFor="users-search">
-          Buscar por usuario o nombre
-          <Input
-            id="users-search"
-            value={filters.search}
-            onChange={(e) => void setFilters({ search: e.target.value, page: 1 })}
-          />
-        </label>
-        <label className="space-y-2" htmlFor="users-active">
-          Estado de la cuenta
-          <select
-            id="users-active"
-            className="min-h-touch w-full rounded-md border border-input bg-card px-3"
-            value={filters.active}
-            onChange={(e) => void setFilters({ active: e.target.value, page: 1 })}
-          >
-            <option value="">Todos</option>
-            <option value="true">Activa</option>
-            <option value="false">Inactiva</option>
-          </select>
-        </label>
-        <label className="space-y-2" htmlFor="users-role">
-          Identificador de rol (UUIDv7)
-          <Input
-            id="users-role"
-            value={filters.roleId}
-            onChange={(e) => void setFilters({ roleId: e.target.value, page: 1 })}
-          />
-        </label>
-        <label className="space-y-2" htmlFor="users-size">
-          Registros por página
-          <Input
-            id="users-size"
-            type="number"
-            min={1}
-            max={100}
-            value={filters.pageSize}
-            onChange={(e) => {
-              const pageSize = Number(e.target.value);
-              if (Number.isInteger(pageSize) && pageSize >= 1 && pageSize <= 100)
-                void setFilters({ pageSize, page: 1 });
-            }}
-          />
-        </label>
-      </div>
-      <Button
-        variant="secondary"
-        onClick={() => void setFilters({ search: null, active: null, roleId: null, page: 1 })}
-      >
-        Limpiar filtros
-      </Button>
+    <div className="min-w-0 space-y-6">
+      <PageHeader
+        title="Cuentas de usuario"
+        description="Orden: creación e identificador ascendentes. El estado de la cuenta no es el estado del perfil de observador."
+      />
+      <section aria-label="Filtros de cuentas" className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="block space-y-2 text-label" htmlFor="users-search">
+            Buscar por usuario o nombre
+            <Input
+              id="users-search"
+              value={filters.search}
+              onChange={(event) => void setFilters({ search: event.target.value, page: 1 })}
+            />
+          </label>
+          <div className="space-y-2">
+            <label className="text-label" htmlFor="users-active">
+              Estado de la cuenta
+            </label>
+            <select
+              id="users-active"
+              className="min-h-touch w-full rounded-md border border-input bg-card px-3"
+              value={filters.active}
+              onChange={(event) => void setFilters({ active: event.target.value, page: 1 })}
+            >
+              <option value="">Todos</option>
+              <option value="true">Activa</option>
+              <option value="false">Inactiva</option>
+            </select>
+          </div>
+          <label className="block space-y-2 text-label" htmlFor="users-role">
+            Identificador de rol (UUIDv7)
+            <Input
+              id="users-role"
+              value={filters.roleId}
+              onChange={(event) => void setFilters({ roleId: event.target.value, page: 1 })}
+            />
+          </label>
+          <label className="block space-y-2 text-label" htmlFor="users-size">
+            Registros por página
+            <Input
+              id="users-size"
+              type="number"
+              min={1}
+              max={100}
+              value={filters.pageSize}
+              onChange={(event) => {
+                const pageSize = Number(event.target.value);
+                if (Number.isInteger(pageSize) && pageSize >= 1 && pageSize <= 100)
+                  void setFilters({ pageSize, page: 1 });
+              }}
+            />
+          </label>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() => void setFilters({ search: null, active: null, roleId: null, page: 1 })}
+        >
+          Limpiar filtros
+        </Button>
+      </section>
       {!valid ? (
         <p role="alert">
           La búsqueda admite hasta 150 caracteres y el rol debe ser un UUIDv7 válido.
         </p>
-      ) : query.isPending ? (
-        <output>Cargando cuentas…</output>
-      ) : query.isError ? (
-        <div role="alert">
-          <p>{userError(query.error)}</p>
-          <Button onClick={() => void query.refetch()}>Reintentar</Button>
-        </div>
       ) : (
-        <>
-          {query.data.items.length ? (
-            <section
-              aria-label="Tabla de cuentas"
-              // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Native scroll region needs keyboard focus.
-              tabIndex={0}
-              className="overflow-x-auto rounded-lg border bg-card"
+        <DataTable
+          columns={columns}
+          data={query.data?.items}
+          isPending={query.isPending}
+          isError={query.isError}
+          isSuccess={query.isSuccess}
+          onRetry={() => void query.refetch()}
+          getRowKey={(account) => account.id}
+          caption="Cuentas de Guerrero"
+          regionLabel="Tabla de cuentas"
+          tableClassName="min-w-200"
+          loadingMessage="Cargando cuentas…"
+          emptyMessage="No hay cuentas en esta página para los filtros seleccionados."
+          errorMessage={query.isError ? userError(query.error) : ''}
+          renderActions={(account) => (
+            <Link
+              className="inline-flex min-h-touch items-center text-primary underline underline-offset-4"
+              aria-label={`Ver cuenta ${account.username}`}
+              to={`/cuentas/${account.id}${search}`}
             >
-              <table className="w-full min-w-200 text-left text-body-sm whitespace-nowrap">
-                <caption className="sr-only">Cuentas de Guerrero</caption>
-                <thead>
-                  <tr>
-                    {['Usuario', 'Nombre', 'Rol', 'Estado', 'Cambio de contraseña', 'Detalle'].map(
-                      (label) => (
-                        <th className="p-4" scope="col" key={label}>
-                          {label}
-                        </th>
-                      ),
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {query.data.items.map((account) => (
-                    <tr className="border-t" key={account.id}>
-                      <th className="min-w-40 p-4 font-medium whitespace-pre-wrap" scope="row">
-                        {account.username}
-                      </th>
-                      <td className="min-w-56 p-4 whitespace-pre-wrap">{account.fullName}</td>
-                      <td className="p-4">{account.role}</td>
-                      <td className="p-4">{account.active ? 'Activa' : 'Inactiva'}</td>
-                      <td className="p-4">
-                        {account.mustChangePassword ? 'Requerido' : 'No requerido'}
-                      </td>
-                      <td className="p-4">
-                        <Link
-                          className="inline-flex min-h-touch items-center text-primary underline"
-                          aria-label={`Ver cuenta ${account.username}`}
-                          to={`/cuentas/${account.id}${search}`}
-                        >
-                          Ver detalle
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          ) : (
-            <output>No hay cuentas en esta página para los filtros seleccionados.</output>
+              Ver detalle
+            </Link>
           )}
-          <nav aria-label="Paginación de cuentas" className="flex flex-wrap items-center gap-4">
-            <Button
-              variant="secondary"
-              disabled={filters.page <= 1}
-              onClick={() => void setFilters({ page: filters.page - 1 })}
-            >
-              Anterior
-            </Button>
-            <p className="tabular-nums">
-              Página {query.data.page} de{' '}
-              {Math.max(1, Math.ceil(query.data.total / query.data.pageSize))} · {query.data.total}{' '}
-              registros
-            </p>
-            <Button
-              variant="secondary"
-              disabled={
-                filters.page >= 1000000 || filters.page * filters.pageSize >= query.data.total
-              }
-              onClick={() => void setFilters({ page: filters.page + 1 })}
-            >
-              Siguiente
-            </Button>
-          </nav>
-        </>
+        />
+      )}
+      {valid && query.isSuccess && (
+        <PaginationPage
+          label="Paginación de cuentas"
+          page={query.data.page}
+          total={query.data.total}
+          limit={query.data.pageSize}
+          previousDisabled={filters.page <= 1}
+          nextDisabled={
+            filters.page >= 1000000 || filters.page * filters.pageSize >= query.data.total
+          }
+          onPreviousClick={() => void setFilters({ page: filters.page - 1 })}
+          onNextClick={() => void setFilters({ page: filters.page + 1 })}
+        />
       )}
     </div>
   );
