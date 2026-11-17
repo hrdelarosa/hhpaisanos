@@ -30,7 +30,12 @@ export class RouteContentBoundary extends Component<Props, State> {
         </section>
       );
     return (
-      <Suspense key={this.props.pathname} fallback={<output>Cargando sección…</output>}>
+      <Suspense
+        key={this.props.pathname}
+        fallback={
+          <output className="block rounded-lg border bg-card p-6">Cargando sección…</output>
+        }
+      >
         {this.props.children}
       </Suspense>
     );

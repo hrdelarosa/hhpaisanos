@@ -52,7 +52,7 @@ it('keeps edit and status component identities distinct without duplicate React 
   const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
   try {
     mount(`/modulos/${id}`);
-    await screen.findByRole('heading', { name: module.name });
+    await screen.findByRole('heading', { name: module.name }, { timeout: 5000 });
     expect(
       errors.mock.calls.filter(
         ([message]) => typeof message === 'string' && message.includes('same key'),

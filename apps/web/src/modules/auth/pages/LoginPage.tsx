@@ -4,6 +4,7 @@ import { Navigate } from 'react-router';
 import { Button } from '../../../components/ui/button';
 import { AuthField } from '../components/AuthField';
 import { SessionStatus } from '../components/SessionStatus';
+import { AuthFrame } from '../components/AuthFrame';
 import { useSession } from '../hooks/use-session';
 import { loginSchema, type LoginInput } from '../schemas/auth';
 
@@ -19,10 +20,12 @@ export function LoginPage() {
     return <Navigate to={session.user?.mustChangePassword ? '/cambiar-contrasena' : '/'} replace />;
   if (session.status !== 'anonymous') return <SessionStatus />;
   return (
-    <section className="mx-auto max-w-form space-y-6 rounded-lg border bg-card p-4 sm:p-6">
+    <AuthFrame>
       <header className="space-y-2">
         <h1 className="text-heading">Iniciar sesión</h1>
-        <p className="text-foreground-secondary">Heroínas y Héroes Paisanos · Guerrero</p>
+        <p className="text-body-sm text-foreground-secondary">
+          Accede con la cuenta asignada para consultar tus herramientas de trabajo.
+        </p>
       </header>
       {session.notice && <output className="block">{session.notice}</output>}
       {session.actionError && (
@@ -60,13 +63,13 @@ export function LoginPage() {
           error={errors.password?.message}
           {...register('password')}
         />
-        <Button type="submit" disabled={session.busy}>
+        <Button type="submit" className="w-full" disabled={session.busy}>
           {session.busy ? 'Iniciando sesión…' : 'Iniciar sesión'}
         </Button>
       </form>
       <Button variant="secondary" disabled={session.busy} onClick={session.recheck}>
         Verificar sesión existente
       </Button>
-    </section>
+    </AuthFrame>
   );
 }

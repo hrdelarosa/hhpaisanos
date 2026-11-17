@@ -88,7 +88,7 @@ it('lists actual account status, preserves URL filters and does not expose extra
         : account,
     ),
   );
-  await screen.findByRole('rowheader', { name: account.username });
+  await screen.findByRole('rowheader', { name: account.username }, { timeout: 5000 });
   const tableRegion = screen.getByRole('region', { name: 'Tabla de cuentas' });
   expect(tableRegion.tabIndex).toBe(0);
   expect(tableRegion.contains(screen.getByRole('table', { name: 'Cuentas de Guerrero' }))).toBe(

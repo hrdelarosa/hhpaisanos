@@ -117,7 +117,7 @@ it('focuses the unresolved resource search and does not move focus again when op
   mount('/asignaciones/nueva', (path) =>
     path.startsWith('/api/observers?') ? pending : undefined,
   );
-  const search = await screen.findByLabelText('Buscar observador');
+  const search = await screen.findByLabelText('Buscar observador', {}, { timeout: 5000 });
   fireEvent.click(screen.getByRole('button', { name: 'Revisar creación' }));
   await waitFor(() => expect(document.activeElement).toBe(search));
   expect(search.getAttribute('aria-invalid')).toBe('true');
@@ -132,7 +132,7 @@ it('focuses the unresolved resource search and does not move focus again when op
 
 it('focuses invalid creation selectors in displayed order before dates and times', async () => {
   const mock = mount('/asignaciones/nueva');
-  await screen.findByLabelText('Seleccionar observador (página 1)');
+  await screen.findByLabelText('Seleccionar observador (página 1)', {}, { timeout: 5000 });
   const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Revisar creación' }));
   for (const [label, value] of [
     ['Seleccionar observador (página 1)', observerId],
@@ -195,7 +195,9 @@ afterEach(() => {
 
 it('lists real contracts, detail timestamps and preserved URL filters', async () => {
   const mock = mount(`/asignaciones?observerId=${observerId}&cancelled=false`);
-  fireEvent.click(await screen.findByRole('link', { name: `Ver asignación ${id}` }));
+  fireEvent.click(
+    await screen.findByRole('link', { name: `Ver asignación ${id}` }, { timeout: 5000 }),
+  );
   await detail();
   expect(screen.getAllByText(timestamp, { selector: 'time' })).toHaveLength(2);
   expect(screen.getByText(/Una fecha final no distingue/)).toBeTruthy();

@@ -76,9 +76,9 @@ it('restores the session without flashing private content, including StrictMode'
     </StrictMode>,
   );
   expect(screen.getByRole('status').textContent).toBe('Verificando sesión…');
-  expect(screen.queryByText('Sesión activa')).toBeNull();
+  expect(screen.queryByRole('heading', { name: 'Inicio' })).toBeNull();
   response.resolve(Response.json(observer));
-  await screen.findByRole('heading', { name: 'Sesión activa' });
+  await screen.findByRole('heading', { name: 'Inicio' });
   expect(screen.getByText('Persona de prueba · OBSERVADOR')).toBeTruthy();
 });
 
@@ -98,9 +98,9 @@ it('redirects anonymous protected navigation and logs in with JSON/CSRF then rer
   expect(window.location.pathname).toBe('/login');
   await expectHeadingFocus('Iniciar sesión');
   submitLogin();
-  await screen.findByRole('heading', { name: 'Sesión activa' });
+  await screen.findByRole('heading', { name: 'Inicio' });
   const [, options] = fetchMock.mock.calls.find(([path]) => path === '/api/auth/login')!;
-  await expectHeadingFocus('Sesión activa');
+  await expectHeadingFocus('Inicio');
   expect(options).toMatchObject({
     method: 'POST',
     credentials: 'same-origin',
@@ -133,11 +133,11 @@ it('distinguishes bootstrap/network failures from anonymous status', async () =>
   vi.stubGlobal('fetch', fetchMock);
   render(<App />);
   await screen.findByRole('heading', { name: 'No se pudo verificar la sesión' });
-  expect(screen.queryByText('Sesión activa')).toBeNull();
+  expect(screen.queryByRole('heading', { name: 'Inicio' })).toBeNull();
   expect(fetchMock).toHaveBeenCalledTimes(1);
   fetchMock.mockResolvedValue(Response.json(observer));
   fireEvent.click(screen.getByRole('button', { name: 'Volver a verificar' }));
-  await screen.findByRole('heading', { name: 'Sesión activa' });
+  await screen.findByRole('heading', { name: 'Inicio' });
 });
 
 it('validates login input without sending credentials and blocks duplicate submissions', async () => {
@@ -223,13 +223,13 @@ it('hides private content immediately during logout and supports retry on uncert
   );
   vi.stubGlobal('fetch', fetchMock);
   render(<App />);
-  await screen.findByRole('heading', { name: 'Sesión activa' });
+  await screen.findByRole('heading', { name: 'Inicio' });
   fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
   expect(screen.queryByText('Administración de prueba · ADMIN')).toBeNull();
   result.resolve(new Response(null, { status: 503 }));
   await screen.findByRole('heading', { name: 'Cierre de sesión sin confirmar' });
   await expectHeadingFocus('Cierre de sesión sin confirmar');
-  expect(screen.queryByRole('heading', { name: 'Sesión activa' })).toBeNull();
+  expect(screen.queryByRole('heading', { name: 'Inicio' })).toBeNull();
   fetchMock.mockResolvedValue(noContent());
   fireEvent.click(screen.getByRole('button', { name: 'Reintentar cierre de sesión' }));
   await screen.findByRole('heading', { name: 'Iniciar sesión' });
@@ -239,15 +239,15 @@ it('hides private content immediately during logout and supports retry on uncert
 });
 
 it.each([
-  [observer, 'Asistencia personal', 'Cuentas · Próximamente'],
-  [{ ...admin, role: 'ENLACE' }, 'Observadores', 'Cuentas · Próximamente'],
+  [observer, 'Asistencia personal', 'Cuentas'],
+  [{ ...admin, role: 'ENLACE' }, 'Observadores', 'Cuentas'],
   [admin, 'Cuentas', 'Asistencia personal'],
 ])(
   'renders only effective role/permission capabilities for $role',
   async (user, present, absent) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(user)));
     render(<App />);
-    await screen.findByText(present);
+    await screen.findByRole('link', { name: present });
     expect(screen.queryByText(absent)).toBeNull();
   },
 );
@@ -282,7 +282,7 @@ it.each([401, 403])(
   async (status) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(observer)));
     renderCaptured();
-    await screen.findByRole('heading', { name: 'Sesión activa' });
+    await screen.findByRole('heading', { name: 'Inicio' });
     const previous = activeClient;
     activeClient.setQueryData(['private'], { synthetic: true });
     await act(async () => {
@@ -303,7 +303,7 @@ it.each([401, 403])(
       await expectHeadingFocus('Iniciar sesión');
     } else {
       expect(activeClient).toBe(previous);
-      expect(screen.getByRole('heading', { name: 'Sesión activa' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Inicio' })).toBeTruthy();
     }
   },
 );
@@ -312,7 +312,7 @@ it('clears private scopes on PASSWORD_CHANGE_REQUIRED and rereads the server pro
   const fetchMock = vi.fn().mockResolvedValue(Response.json(observer));
   vi.stubGlobal('fetch', fetchMock);
   renderCaptured();
-  await screen.findByRole('heading', { name: 'Sesión activa' });
+  await screen.findByRole('heading', { name: 'Inicio' });
   const previous = activeClient;
   fetchMock.mockResolvedValue(Response.json({ ...observer, mustChangePassword: true }));
   await act(async () => {
@@ -338,7 +338,7 @@ it.each([401, 403])(
       vi.fn().mockImplementation(async () => Response.json(observer)),
     );
     renderCaptured();
-    await screen.findByRole('heading', { name: 'Sesión activa' });
+    await screen.findByRole('heading', { name: 'Inicio' });
     const previous = activeClient;
     previous.setQueryData(['private'], 'synthetic');
     await act(async () => {
@@ -358,7 +358,7 @@ it.each([401, 403])(
       expect(previous.getQueryData(['private'])).toBeUndefined();
     } else {
       expect(activeClient).toBe(previous);
-      expect(screen.getByRole('heading', { name: 'Sesión activa' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Inicio' })).toBeTruthy();
     }
   },
 );
@@ -404,7 +404,7 @@ it('isolates late query and mutation completions from the next account', async (
     }),
   );
   renderCaptured();
-  await screen.findByRole('heading', { name: 'Sesión activa' });
+  await screen.findByRole('heading', { name: 'Inicio' });
   const old = activeClient;
   const pending = deferred<string>();
   const late = old
@@ -429,7 +429,7 @@ it('blocks stale data during revalidation and isolates a changed account on focu
   const fetchMock = vi.fn().mockResolvedValue(Response.json(observer));
   vi.stubGlobal('fetch', fetchMock);
   renderCaptured();
-  await screen.findByRole('heading', { name: 'Sesión activa' });
+  await screen.findByRole('heading', { name: 'Inicio' });
   const previous = activeClient;
   previous.setQueryData(['private'], 'old data');
   const next = deferred<Response>();
@@ -450,7 +450,7 @@ it('removes private state when focus revalidation finds a revoked session', asyn
   const fetchMock = vi.fn().mockImplementation(async () => Response.json(observer));
   vi.stubGlobal('fetch', fetchMock);
   renderCaptured();
-  await screen.findByRole('heading', { name: 'Sesión activa' });
+  await screen.findByRole('heading', { name: 'Inicio' });
   const previous = activeClient;
   previous.setQueryData(['private'], 'synthetic');
   fetchMock.mockImplementation(async () => unauthorized());

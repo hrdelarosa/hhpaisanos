@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
 import { Button } from '../../../components/ui/button';
 import { AuthField } from '../components/AuthField';
+import { AuthFrame } from '../components/AuthFrame';
 import { useSession } from '../hooks/use-session';
 import { passwordSchema, type PasswordInput } from '../schemas/auth';
 
@@ -15,9 +16,9 @@ export function ChangePasswordPage() {
     formState: { errors },
   } = useForm<PasswordInput>({ resolver: zodResolver(passwordSchema) });
   return (
-    <section className="mx-auto max-w-form space-y-6 rounded-lg border bg-card p-4 sm:p-6">
+    <AuthFrame>
       <h1 className="text-heading">Cambiar contraseña</h1>
-      <p>
+      <p className="text-body-sm text-foreground-secondary">
         {session.user?.mustChangePassword
           ? 'Debes cambiar tu contraseña antes de continuar.'
           : 'Actualiza tu contraseña.'}{' '}
@@ -66,7 +67,7 @@ export function ChangePasswordPage() {
           error={errors.confirmPassword?.message}
           {...register('confirmPassword')}
         />
-        <Button type="submit" disabled={session.busy}>
+        <Button type="submit" className="w-full" disabled={session.busy}>
           {session.busy ? 'Cambiando contraseña…' : 'Actualizar contraseña'}
         </Button>
       </form>
@@ -80,6 +81,6 @@ export function ChangePasswordPage() {
           Cerrar sesión
         </Button>
       </div>
-    </section>
+    </AuthFrame>
   );
 }

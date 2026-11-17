@@ -1,17 +1,23 @@
 import { Button } from '../../../components/ui/button';
 import { useSession } from '../hooks/use-session';
+import { AuthFrame } from './AuthFrame';
 
 export function SessionStatus() {
   const session = useSession();
-  if (session.status === 'loading') return <output>Verificando sesión…</output>;
+  if (session.status === 'loading')
+    return (
+      <AuthFrame>
+        <output>Verificando sesión…</output>
+      </AuthFrame>
+    );
   return (
-    <section className="mx-auto max-w-form space-y-4">
+    <AuthFrame>
       <h1 className="text-heading">
         {session.status === 'logoutFailed'
           ? 'Cierre de sesión sin confirmar'
           : 'No se pudo verificar la sesión'}
       </h1>
-      <p role="alert">
+      <p role="alert" className="rounded-md bg-warning-surface p-4 text-warning">
         {session.status === 'logoutFailed'
           ? session.notice
           : 'No mostraremos contenido privado hasta verificar tu sesión. Revisa la conexión y vuelve a intentarlo.'}
@@ -26,6 +32,6 @@ export function SessionStatus() {
           Reintentar cierre de sesión
         </Button>
       </div>
-    </section>
+    </AuthFrame>
   );
 }
