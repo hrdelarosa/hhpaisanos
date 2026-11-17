@@ -1,10 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { Link } from 'react-router';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
+import { useInvalidFieldFocus } from '../../../hooks/use-invalid-field-focus';
+import { fieldErrorAttributes } from '../../../lib/field-error';
 import { useSession } from '../../auth/hooks/use-session';
 import { assignmentQuery, listAssignments } from '../../assignments/api/assignments';
 import { ResourcePicker } from '../../assignments/components/ResourcePicker';
@@ -14,6 +16,8 @@ import { manualInputSchema, missingLocationLabels, type ManualInput } from '../s
 import { administrativeAttendanceError } from '../utils/administration';
 
 export function ManualAttendancePage() {
+  const id = useId();
+  const { formRef, prepareInvalidFocus } = useInvalidFieldFocus();
   const { user } = useSession();
   const client = useQueryClient();
   const lock = useRef(false);
@@ -41,6 +45,7 @@ export function ManualAttendancePage() {
     formState: { errors },
   } = useForm<ManualInput>({
     resolver: zodResolver(manualInputSchema),
+    shouldFocusError: false,
     defaultValues: {
       observerId: '',
       assignmentId: '',
@@ -75,6 +80,9 @@ export function ManualAttendancePage() {
       ),
     enabled: allowed && catalogs && Boolean(observerId && operativeId),
   });
+  const historicalSelectionAvailable = Boolean(observerId && operativeId && periods.isSuccess);
+  const errorAttributes = (field: keyof ManualInput) =>
+    fieldErrorAttributes(`${id}-${field}-error`, errors[field]?.message);
   async function preflight(input: ManualInput, expected?: string) {
     try {
       await client.cancelQueries({
@@ -241,6 +249,7 @@ export function ManualAttendancePage() {
         </section>
       ) : (
         <form
+          ref={formRef}
           noValidate
           className="space-y-4"
           onSubmit={(event) =>
@@ -258,21 +267,23 @@ export function ManualAttendancePage() {
                 lock.current = false;
                 setBusy(false);
               }
-            })(event)
+            }, prepareInvalidFocus())(event)
           }
         >
           <ResourcePicker
             kind="observer"
+            error={errors.observerId?.message}
             value={observerId}
             disabled={busy}
             onChange={(id) => {
-              setValue('observerId', id);
+              setValue('observerId', id, { shouldValidate: true });
               setValue('assignmentId', '');
               setPage(1);
             }}
           />
           <ResourcePicker
             kind="operative"
+            error={!historicalSelectionAvailable ? errors.assignmentId?.message : undefined}
             value={operativeId}
             disabled={busy}
             onChange={(id) => {
@@ -300,6 +311,7 @@ export function ManualAttendancePage() {
                 <label className="block">
                   Asignación histórica
                   <select
+                    {...errorAttributes('assignmentId')}
                     className="min-h-touch w-full min-w-0 rounded-md border border-input bg-card px-3"
                     {...register('assignmentId')}
                   >
@@ -340,13 +352,20 @@ export function ManualAttendancePage() {
                 </div>
               </fieldset>
             ))}
-          <label className="block space-y-2" htmlFor="manual-date">
+          <label className="block space-y-2" htmlFor={`${id}-date`}>
             Fecha civil de asistencia
-            <Input id="manual-date" type="date" disabled={busy} {...register('date')} />
+            <Input
+              id={`${id}-date`}
+              type="date"
+              disabled={busy}
+              {...errorAttributes('date')}
+              {...register('date')}
+            />
           </label>
           <label className="block space-y-2">
             Tipo de marca
             <select
+              {...errorAttributes('type')}
               className="min-h-touch w-full rounded-md border border-input bg-card px-3"
               disabled={busy}
               {...register('type')}
@@ -355,13 +374,19 @@ export function ManualAttendancePage() {
               <option value="salida">Salida</option>
             </select>
           </label>
-          <label className="block space-y-2" htmlFor="manual-timestamp">
+          <label className="block space-y-2" htmlFor={`${id}-timestamp`}>
             Hora oficial UTC (YYYY-MM-DDTHH:mm:ss.ffffffZ)
-            <Input id="manual-timestamp" disabled={busy} {...register('officialTimestamp')} />
+            <Input
+              id={`${id}-timestamp`}
+              disabled={busy}
+              {...errorAttributes('officialTimestamp')}
+              {...register('officialTimestamp')}
+            />
           </label>
           <label className="block space-y-2">
             Motivo de falta de ubicación
             <select
+              {...errorAttributes('missingLocationReason')}
               className="min-h-touch w-full rounded-md border border-input bg-card px-3"
               disabled={busy}
               {...register('missingLocationReason')}
@@ -374,15 +399,25 @@ export function ManualAttendancePage() {
               ))}
             </select>
           </label>
-          <label className="block space-y-2" htmlFor="manual-reason">
+          <label className="block space-y-2" htmlFor={`${id}-reason`}>
             Motivo administrativo de captura
-            <Input id="manual-reason" disabled={busy} {...register('reason')} />
+            <Input
+              id={`${id}-reason`}
+              disabled={busy}
+              {...errorAttributes('reason')}
+              {...register('reason')}
+            />
           </label>
-          {Object.entries(errors).map(([key, error]) => (
-            <p key={key} role="alert">
-              {error.message}
-            </p>
-          ))}
+          {Object.entries(errors)
+            .filter(
+              ([key]) =>
+                key !== 'observerId' && (key !== 'assignmentId' || historicalSelectionAvailable),
+            )
+            .map(([key, error]) => (
+              <p key={key} id={`${id}-${key}-error`}>
+                {error.message}
+              </p>
+            ))}
           <Button type="submit" disabled={busy}>
             Revisar captura manual
           </Button>

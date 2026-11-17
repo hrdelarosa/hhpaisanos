@@ -158,6 +158,91 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
+
+function errorDescription(control: HTMLElement) {
+  expect(control.getAttribute('aria-invalid')).toBe('true');
+  const ids = control.getAttribute('aria-describedby')?.split(' ') ?? [];
+  expect(ids.length).toBeGreaterThan(0);
+  return ids
+    .map((id) => {
+      const matches = [...document.querySelectorAll('[id]')].filter((node) => node.id === id);
+      expect(matches).toHaveLength(1);
+      expect(matches[0].textContent).toBeTruthy();
+      expect(matches[0].getAttribute('role')).not.toBe('alert');
+      return matches[0].textContent;
+    })
+    .join(' ');
+}
+
+it('associates manual errors and focuses resource selectors before native fields in form order', async () => {
+  const mock = mount('/asistencias/manual');
+  const observer = await screen.findByLabelText('Seleccionar observador (página 1)');
+  const submit = () =>
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar captura manual' }));
+  submit();
+  await waitFor(() => expect(document.activeElement).toBe(observer));
+  expect(errorDescription(observer)).toBe('Selecciona un observador válido.');
+  const operative = screen.getByLabelText('Seleccionar operativo (página 1)');
+  expect(errorDescription(operative)).toBe('Selecciona una asignación válida.');
+  for (const label of [
+    'Fecha civil de asistencia',
+    'Hora oficial UTC (YYYY-MM-DDTHH:mm:ss.ffffffZ)',
+    'Motivo de falta de ubicación',
+    'Motivo administrativo de captura',
+  ])
+    errorDescription(screen.getByLabelText(label));
+  fireEvent.change(observer, { target: { value: id } });
+  submit();
+  await waitFor(() => expect(document.activeElement).toBe(operative));
+  fireEvent.change(operative, { target: { value: id } });
+  const period = await screen.findByLabelText('Asignación histórica');
+  submit();
+  await waitFor(() => expect(document.activeElement).toBe(period));
+  expect(errorDescription(period)).toBe('Selecciona una asignación válida.');
+  fireEvent.change(period, { target: { value: assignmentId } });
+  for (const [label, value] of [
+    ['Fecha civil de asistencia', manual.date],
+    ['Hora oficial UTC (YYYY-MM-DDTHH:mm:ss.ffffffZ)', timestamp],
+    ['Motivo de falta de ubicación', manual.missingLocationReason],
+    ['Motivo administrativo de captura', manual.reason],
+  ]) {
+    submit();
+    const control = screen.getByLabelText(label);
+    await waitFor(() => expect(document.activeElement).toBe(control));
+    fireEvent.change(control, { target: { value } });
+    await waitFor(() => expect(control.getAttribute('aria-invalid')).toBe('false'));
+  }
+  submit();
+  await screen.findByRole('region', { name: 'Confirmación de captura manual' });
+  expect(mock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+  expect(document.title).toBe('Captura manual de asistencia | Heroínas y Héroes Paisanos');
+});
+
+it('links correction and annulment errors uniquely and focuses the first invalid historical control', async () => {
+  const mock = mount();
+  const timestampControl = await screen.findByLabelText(
+    'Nueva hora oficial UTC (YYYY-MM-DDTHH:mm:ss.ffffffZ)',
+  );
+  fireEvent.change(timestampControl, { target: { value: 'invalid' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Revisar corrección' }));
+  await waitFor(() => expect(document.activeElement).toBe(timestampControl));
+  expect(errorDescription(timestampControl)).toContain('YYYY-MM-DDTHH:mm:ss.ffffffZ');
+  const correctReason = screen.getByLabelText('Motivo de corrección');
+  const correctionErrorId = correctReason.getAttribute('aria-describedby');
+  errorDescription(correctReason);
+  fireEvent.click(screen.getByRole('button', { name: 'Revisar anulación' }));
+  const annulReason = screen.getByLabelText('Motivo de anulación');
+  await waitFor(() => expect(document.activeElement).toBe(annulReason));
+  errorDescription(annulReason);
+  expect(annulReason.getAttribute('aria-describedby')).not.toBe(correctionErrorId);
+  fireEvent.change(timestampControl, { target: { value: timestamp } });
+  fireEvent.click(screen.getByRole('button', { name: 'Revisar corrección' }));
+  await waitFor(() => expect(document.activeElement).toBe(correctReason));
+  expect(correctReason.getAttribute('aria-describedby')).toBe(correctionErrorId);
+  expect(timestampControl.getAttribute('aria-describedby')).toBeNull();
+  expect(timestampControl.getAttribute('aria-invalid')).toBe('false');
+  expect(mock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+});
 async function prepare(operation: 'corrección' | 'anulación') {
   fireEvent.change(await screen.findByLabelText(`Motivo de ${operation}`), {
     target: { value: 'Motivo sintético' },

@@ -108,6 +108,58 @@ const writes = (mock: ReturnType<typeof mount>) =>
       requestPath(url).startsWith('/api/assignments') && options?.method === 'POST',
   );
 const detail = () => screen.findByRole('heading', { name: 'Detalle de asignación' });
+
+it('focuses the unresolved resource search and does not move focus again when options arrive', async () => {
+  let finish!: (response: Response) => void;
+  const pending = new Promise<Response>((resolve) => {
+    finish = resolve;
+  });
+  mount('/asignaciones/nueva', (path) =>
+    path.startsWith('/api/observers?') ? pending : undefined,
+  );
+  const search = await screen.findByLabelText('Buscar observador');
+  fireEvent.click(screen.getByRole('button', { name: 'Revisar creación' }));
+  await waitFor(() => expect(document.activeElement).toBe(search));
+  expect(search.getAttribute('aria-invalid')).toBe('true');
+  const date = screen.getByLabelText('Inicio de vigencia');
+  date.focus();
+  finish(Response.json({ items: [observer], total: 1, page: 1, pageSize: 20 }));
+  const select = await screen.findByLabelText('Seleccionar observador (página 1)');
+  expect(select.getAttribute('aria-invalid')).toBe('true');
+  expect(search.getAttribute('aria-invalid')).toBe('false');
+  expect(document.activeElement).toBe(date);
+});
+
+it('focuses invalid creation selectors in displayed order before dates and times', async () => {
+  const mock = mount('/asignaciones/nueva');
+  await screen.findByLabelText('Seleccionar observador (página 1)');
+  const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Revisar creación' }));
+  for (const [label, value] of [
+    ['Seleccionar observador (página 1)', observerId],
+    ['Seleccionar operativo (página 1)', operativeId],
+    ['Seleccionar módulo de atención (página 1)', attentionModuleId],
+    ['Inicio de vigencia', '2026-11-16'],
+    ['Fin de vigencia', '2026-11-17'],
+    ['Hora de entrada', '09:00:00'],
+    ['Hora de salida', '17:00:00'],
+  ]) {
+    submit();
+    const control = screen.getByLabelText(label);
+    await waitFor(() => expect(document.activeElement).toBe(control));
+    expect(control.getAttribute('aria-invalid')).toBe('true');
+    const errorId = control.getAttribute('aria-describedby');
+    expect(errorId).toBeTruthy();
+    expect(document.getElementById(errorId!)?.textContent).toBeTruthy();
+    expect(document.getElementById(errorId!)?.getAttribute('role')).not.toBe('alert');
+    change(label, value);
+    await waitFor(() => expect(control.getAttribute('aria-invalid')).toBe('false'));
+    expect(control.getAttribute('aria-describedby')).toBeNull();
+  }
+  submit();
+  await screen.findByRole('heading', { name: 'Confirmar creación' });
+  expect(writes(mock)).toHaveLength(0);
+  expect(document.title).toBe('Crear asignación | Heroínas y Héroes Paisanos');
+});
 function change(label: string, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 }

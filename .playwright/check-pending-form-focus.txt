@@ -1,0 +1,44 @@
+async page => {
+  // Delay the real read, without substituting catalog data or mutation responses.
+  const assert = (value, message) => { if (!value) throw new Error(message); };
+  const focused = locator => locator.evaluate(element => element === document.activeElement);
+  const tabTo = async locator => {
+    for (let index = 0; index < 100; index++) {
+      if (await focused(locator)) return;
+      await page.keyboard.press('Tab');
+    }
+    throw new Error('Unreachable keyboard target');
+  };
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  const pattern = '**/api/observers?**';
+  await page.route(pattern, async route => { await pending; await route.continue(); });
+  try {
+    await page.goto('http://localhost:5173/asignaciones/nueva');
+    await page.waitForFunction(() => document.activeElement?.textContent?.trim() === 'Crear asignación');
+    const search = page.getByRole('textbox', { name: 'Buscar observador', exact: true });
+    await search.waitFor();
+    assert(await page.getByRole('combobox', { name: 'Seleccionar observador (página 1)', exact: true }).count() === 0, 'Read was not pending');
+    await tabTo(page.getByRole('button', { name: 'Revisar creación', exact: true }));
+    await page.keyboard.press('Enter');
+    const id = await search.getAttribute('id');
+    await page.waitForFunction(id => document.activeElement?.id === id && document.activeElement?.getAttribute('aria-invalid') === 'true', id);
+    const cdp = await page.context().newCDPSession(page);
+    const remote = await cdp.send('Runtime.evaluate', { expression: 'document.activeElement' });
+    const tree = await cdp.send('Accessibility.getPartialAXTree', { objectId: remote.result.objectId });
+    assert(tree.nodes.some(node => node.name?.value === 'Buscar observador' && node.description?.value === 'Selecciona un registro válido.'), 'Pending search lacks accessible error description');
+    await cdp.detach();
+    const date = page.getByLabel('Inicio de vigencia', { exact: true });
+    await tabTo(date);
+    release();
+    const select = page.getByRole('combobox', { name: 'Seleccionar observador (página 1)', exact: true });
+    await select.waitFor();
+    assert(await focused(date), 'Delayed catalog stole intentional keyboard focus');
+    assert(await select.getAttribute('aria-invalid') === 'true', 'Selection error was lost');
+    assert(await search.getAttribute('aria-invalid') === 'false', 'Search kept stale invalid state');
+    return { pendingSearchFocusAndDescription: 'pass', intentionalFocusPreserved: 'pass' };
+  } finally {
+    release();
+    await page.unroute(pattern);
+  }
+}

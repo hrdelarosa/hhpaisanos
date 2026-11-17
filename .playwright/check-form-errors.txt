@@ -1,0 +1,143 @@
+async page => {
+  // Requires an authenticated synthetic ADMIN, catalogs, an assignment and one pending entrance.
+  const assert = (value, message) => { if (!value) throw new Error(message); };
+  const focused = locator => locator.evaluate(element => element === document.activeElement);
+  const tabTo = async locator => {
+    for (let index = 0; index < 100; index++) {
+      if (await focused(locator)) return;
+      await page.keyboard.press('Tab');
+    }
+    throw new Error('Unreachable keyboard target');
+  };
+  const activate = async locator => { await tabTo(locator); await page.keyboard.press('Enter'); };
+  const heading = async name => {
+    await page.waitForFunction(name => document.activeElement?.textContent?.trim() === name, name);
+    assert(await page.title() === name + ' | Heroínas y Héroes Paisanos', 'Route title');
+  };
+  const cdp = await page.context().newCDPSession(page);
+  const invalidFocus = async locator => {
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-invalid') === 'true');
+    assert(await focused(locator), 'Wrong first invalid control');
+    const description = await locator.evaluate(element => {
+      const ids = element.getAttribute('aria-describedby')?.split(' ') ?? [];
+      if (!ids.length) throw new Error('Missing error association');
+      return ids.map(id => {
+        const nodes = [...document.querySelectorAll('[id]')].filter(node => node.id === id);
+        if (nodes.length !== 1 || !nodes[0].textContent) throw new Error('Missing/duplicate error ID');
+        if (nodes[0].getAttribute('role') === 'alert') throw new Error('Repeated field alerts');
+        return nodes[0].textContent.trim();
+      }).join(' ');
+    });
+    const remote = await cdp.send('Runtime.evaluate', { expression: 'document.activeElement' });
+    const tree = await cdp.send('Accessibility.getPartialAXTree', { objectId: remote.result.objectId });
+    const control = tree.nodes.find(node => !node.ignored && node.description?.value === description);
+    assert(control?.name?.value, 'Missing accessible name/description in Chrome AX tree');
+    const ring = await locator.evaluate(element => ({ style: getComputedStyle(element).outlineStyle, width: getComputedStyle(element).outlineWidth }));
+    assert(ring.style === 'solid' && parseFloat(ring.width) >= 2, 'Invalid focus indicator');
+    return { name: control.name.value, description };
+  };
+  const selectFirst = async locator => {
+    await tabTo(locator);
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    assert((await locator.inputValue()).length > 0, 'Keyboard resource selection');
+  };
+  const results = [];
+  await page.goto('http://localhost:5173/asignaciones/nueva');
+  await heading('Crear asignación');
+  const creation = page.getByRole('button', { name: 'Revisar creación', exact: true });
+  for (const name of ['Seleccionar observador (página 1)', 'Seleccionar operativo (página 1)', 'Seleccionar módulo de atención (página 1)']) {
+    const select = page.getByRole('combobox', { name, exact: true });
+    await select.waitFor();
+    await activate(creation);
+    results.push(await invalidFocus(select));
+    await selectFirst(select);
+  }
+  // Native date/time values are fixture setup; submissions and selector/text recovery use the keyboard.
+  for (const [name, value] of [['Inicio de vigencia', '2026-11-15'], ['Fin de vigencia', '2026-11-16'], ['Hora de entrada', '09:00:00'], ['Hora de salida', '17:00:00']]) {
+    await activate(creation);
+    const field = page.getByLabel(name, { exact: true });
+    results.push(await invalidFocus(field));
+    await field.fill(value);
+  }
+  await activate(creation);
+  await page.getByRole('heading', { name: 'Confirmar creación', exact: true }).waitFor();
+  await activate(page.getByRole('button', { name: 'Volver al formulario', exact: true }));
+  assert(await page.locator('form [aria-invalid="true"]').count() === 0, 'Assignment error recovery');
+
+  await page.goto('http://localhost:5173/asistencias/manual');
+  await heading('Captura manual de asistencia');
+  const manual = page.getByRole('button', { name: 'Revisar captura manual', exact: true });
+  for (const name of ['Seleccionar observador (página 1)', 'Seleccionar operativo (página 1)']) {
+    const select = page.getByRole('combobox', { name, exact: true });
+    await select.waitFor();
+    await activate(manual);
+    results.push(await invalidFocus(select));
+    await selectFirst(select);
+  }
+  const period = page.getByRole('combobox', { name: 'Asignación histórica', exact: true });
+  await period.waitFor();
+  await activate(manual);
+  results.push(await invalidFocus(period));
+  await selectFirst(period);
+  for (const [name, value] of [['Fecha civil de asistencia', '2026-11-15'], ['Hora oficial UTC (YYYY-MM-DDTHH:mm:ss.ffffffZ)', '2026-11-15T15:00:00.000000Z']]) {
+    await activate(manual);
+    const field = page.getByLabel(name, { exact: true });
+    results.push(await invalidFocus(field));
+    await field.fill(value);
+  }
+  await activate(manual);
+  const locationReason = page.getByRole('combobox', { name: 'Motivo de falta de ubicación', exact: true });
+  results.push(await invalidFocus(locationReason));
+  await selectFirst(locationReason);
+  await activate(manual);
+  const manualReason = page.getByLabel('Motivo administrativo de captura', { exact: true });
+  results.push(await invalidFocus(manualReason));
+  await page.keyboard.type('Motivo sintético Q2C');
+  await activate(manual);
+  await page.getByRole('region', { name: 'Confirmación de captura manual', exact: true }).waitFor();
+  await activate(page.getByRole('button', { name: 'Volver sin aplicar', exact: true }));
+  assert(await page.locator('form [aria-invalid="true"]').count() === 0, 'Manual error recovery');
+
+  await page.goto('http://localhost:5173/asistencias');
+  await heading('Asistencias administrativas');
+  await activate(page.getByRole('link', { name: /Ver detalle de entrada/ }).first());
+  await heading('Detalle de asistencia');
+  const timestamp = page.getByLabel('Nueva hora oficial UTC (YYYY-MM-DDTHH:mm:ss.ffffffZ)', { exact: true });
+  const original = await timestamp.inputValue();
+  await tabTo(timestamp);
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.type('invalid');
+  const correct = page.getByRole('button', { name: 'Revisar corrección', exact: true });
+  await activate(correct);
+  results.push(await invalidFocus(timestamp));
+  const correctReason = page.getByLabel('Motivo de corrección', { exact: true });
+  const correctionError = await correctReason.getAttribute('aria-describedby');
+  await activate(page.getByRole('button', { name: 'Revisar anulación', exact: true }));
+  const annulReason = page.getByLabel('Motivo de anulación', { exact: true });
+  results.push(await invalidFocus(annulReason));
+  assert(await annulReason.getAttribute('aria-describedby') !== correctionError, 'Conflicting historical error IDs');
+  await page.keyboard.type('Motivo sintético de anulación');
+  await activate(page.getByRole('button', { name: 'Revisar anulación', exact: true }));
+  await page.getByRole('region', { name: 'Confirmación de anulación', exact: true }).waitFor();
+  await activate(page.getByRole('region', { name: 'Confirmación de anulación', exact: true }).getByRole('button', { name: 'Volver sin aplicar', exact: true }));
+  await timestamp.fill(original);
+  await activate(correct);
+  results.push(await invalidFocus(correctReason));
+  assert(await correctReason.getAttribute('aria-describedby') === correctionError, 'Unstable error ID');
+  await page.keyboard.type('Motivo sintético de corrección');
+  await activate(correct);
+  await page.getByRole('region', { name: 'Confirmación de corrección', exact: true }).waitFor();
+  await activate(page.getByRole('region', { name: 'Confirmación de corrección', exact: true }).getByRole('button', { name: 'Volver sin aplicar', exact: true }));
+
+  // Existing Q2B review summary/cancel focus must still take precedence over old form errors.
+  await tabTo(page.getByLabel('Motivo de revisión', { exact: true }));
+  await page.keyboard.type('Revisión sintética Q2B compatible');
+  await activate(page.getByRole('button', { name: 'Revisar decisión', exact: true }));
+  await page.waitForFunction(() => document.activeElement?.textContent?.trim() === 'Confirmar aceptación');
+  await activate(page.getByRole('region', { name: 'Confirmación de revisión', exact: true }).getByRole('button', { name: 'Volver sin aplicar', exact: true }));
+  assert(await focused(page.getByRole('combobox', { name: 'Decisión', exact: true })), 'Q2B cancel focus');
+  assert(await page.title() === 'Detalle de asistencia | Heroínas y Héroes Paisanos', 'Q2B route title');
+  await cdp.detach();
+  return { invalidControls: results, keyboardSubmissionsAndRecovery: 'pass', q2bCompatibility: 'pass' };
+}

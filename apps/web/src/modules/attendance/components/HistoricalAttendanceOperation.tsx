@@ -1,11 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router';
 import { z } from 'zod';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
+import { useInvalidFieldFocus } from '../../../hooks/use-invalid-field-focus';
+import { fieldErrorAttributes } from '../../../lib/field-error';
 import { useSession } from '../../auth/hooks/use-session';
 import {
   administrativeDetailQuery,
@@ -27,6 +29,8 @@ export function HistoricalAttendanceOperation({
   record: AdministrativeDetail;
   operation: 'correct' | 'annul';
 }) {
+  const id = useId();
+  const { formRef, prepareInvalidFocus } = useInvalidFieldFocus();
   const { user } = useSession();
   const client = useQueryClient();
   const lock = useRef(false);
@@ -56,6 +60,7 @@ export function HistoricalAttendanceOperation({
     formState: { errors },
   } = useForm<CorrectionInput>({
     resolver: zodResolver(schema),
+    shouldFocusError: false,
     defaultValues: { reason: '', officialTimestamp: record.officialTimestamp },
   });
   const fingerprint = (v: AdministrativeDetail) =>
@@ -182,6 +187,7 @@ export function HistoricalAttendanceOperation({
         </section>
       ) : (
         <form
+          ref={formRef}
           noValidate
           className="space-y-4"
           onSubmit={(event) =>
@@ -202,26 +208,36 @@ export function HistoricalAttendanceOperation({
                 lock.current = false;
                 setBusy(false);
               }
-            })(event)
+            }, prepareInvalidFocus())(event)
           }
         >
           {correct && (
-            <label className="block space-y-2" htmlFor={`${operation}-timestamp`}>
+            <label className="block space-y-2" htmlFor={`${id}-timestamp`}>
               Nueva hora oficial UTC (YYYY-MM-DDTHH:mm:ss.ffffffZ)
               <Input
-                id={`${operation}-timestamp`}
+                id={`${id}-timestamp`}
                 disabled={busy}
-                aria-invalid={Boolean(errors.officialTimestamp)}
+                {...fieldErrorAttributes(
+                  `${id}-timestamp-error`,
+                  errors.officialTimestamp?.message,
+                )}
                 {...register('officialTimestamp')}
               />
             </label>
           )}
-          {errors.officialTimestamp && <p role="alert">{errors.officialTimestamp.message}</p>}
-          <label className="block space-y-2">
+          {errors.officialTimestamp && (
+            <p id={`${id}-timestamp-error`}>{errors.officialTimestamp.message}</p>
+          )}
+          <label className="block space-y-2" htmlFor={`${id}-reason`}>
             Motivo de {label.toLowerCase()}
-            <Input disabled={busy} aria-invalid={Boolean(errors.reason)} {...register('reason')} />
+            <Input
+              id={`${id}-reason`}
+              disabled={busy}
+              {...fieldErrorAttributes(`${id}-reason-error`, errors.reason?.message)}
+              {...register('reason')}
+            />
           </label>
-          {errors.reason && <p role="alert">{errors.reason.message}</p>}
+          {errors.reason && <p id={`${id}-reason-error`}>{errors.reason.message}</p>}
           <Button disabled={busy} type="submit">
             Revisar {label.toLowerCase()}
           </Button>
