@@ -28,9 +28,11 @@ export function AuthenticatedLayout() {
           </Button>
         </nav>
       </header>
-      <RouteContentBoundary pathname={pathname}>
-        <Outlet />
-      </RouteContentBoundary>
+      <div data-route-content>
+        <RouteContentBoundary pathname={pathname}>
+          <Outlet />
+        </RouteContentBoundary>
+      </div>
     </div>
   );
 }

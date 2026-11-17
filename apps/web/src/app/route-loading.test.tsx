@@ -12,6 +12,7 @@ import { SessionHomePage } from '../modules/auth/pages/SessionHomePage';
 import type { AuthUser } from '../modules/auth/schemas/auth';
 import { OperativesLayout } from '../modules/operatives/components/OperativesLayout';
 import { AppProviders } from './providers';
+import { AppLayout } from './layouts/AppLayout';
 
 const admin: AuthUser = {
   id: 'synthetic-admin',
@@ -38,7 +39,11 @@ function PrivatePage() {
     queryFn: ({ signal }) => http('/api/operatives', { signal }),
   });
   return (
-    <p>{query.isSuccess ? `Contenido privado de ${user?.fullName}` : 'Consultando registros…'}</p>
+    <section>
+      <h1>Operativos de prueba</h1>
+      <p>{query.isSuccess ? `Contenido privado de ${user?.fullName}` : 'Consultando registros…'}</p>
+      <button>Acción de prueba</button>
+    </section>
   );
 }
 
@@ -63,22 +68,27 @@ function setup(Page: ComponentType, user: AuthUser | null = admin) {
   function TestRoutes() {
     return useRoutes([
       {
-        element: <RequireSession />,
+        element: <AppLayout />,
         children: [
           {
-            element: <AuthenticatedLayout />,
+            element: <RequireSession />,
             children: [
-              { index: true, element: <SessionHomePage /> },
               {
-                path: 'operativos',
-                element: <OperativesLayout />,
-                children: [{ index: true, element: <Page /> }],
+                element: <AuthenticatedLayout />,
+                children: [
+                  { index: true, element: <SessionHomePage /> },
+                  {
+                    path: 'operativos',
+                    element: <OperativesLayout />,
+                    children: [{ index: true, element: <Page /> }],
+                  },
+                ],
               },
             ],
           },
+          { path: 'login', element: <LoginPage /> },
         ],
       },
-      { path: 'login', element: <LoginPage /> },
     ]);
   }
   render(
@@ -110,6 +120,12 @@ it('keeps navigation/logout usable while loading, then reuses the lazy module on
   await act(async () => pending.resolve({ default: PrivatePage }));
   fireEvent.click(screen.getByRole('link', { name: 'Operativos' }));
   await screen.findByText('Contenido privado de Cuenta anterior');
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', { name: 'Operativos de prueba' }),
+    ),
+  );
+  expect(document.title).toBe('Operativos de prueba | Heroínas y Héroes Paisanos');
   expect(load).toHaveBeenCalledTimes(1);
 });
 
@@ -118,17 +134,29 @@ it('handles rejected imports without exposing errors or retrying writes/imports,
   const load = vi.fn(() => Promise.reject(new Error('synthetic-internal-error')));
   const fetchMock = setup(lazy(load));
   await screen.findByRole('heading', { name: 'No se pudo cargar esta sección' });
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', { name: 'No se pudo cargar esta sección' }),
+    ),
+  );
+  expect(document.title).toContain('No se pudo cargar esta sección');
   expect(screen.getByRole('alert').textContent).toContain('recarga esta página manualmente');
   expect(screen.queryByText('synthetic-internal-error')).toBeNull();
   expect(window.location.pathname).toBe('/operativos');
   fireEvent.click(screen.getByRole('link', { name: 'Inicio' }));
   await screen.findByRole('heading', { name: 'Sesión activa' });
+  await waitFor(() =>
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Sesión activa' })),
+  );
   fireEvent.click(screen.getByRole('link', { name: 'Operativos' }));
   await screen.findByRole('heading', { name: 'No se pudo cargar esta sección' });
   expect(load).toHaveBeenCalledTimes(1);
   expect(fetchMock.mock.calls.every(([path]) => path === '/api/auth/me')).toBe(true);
   fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
   await screen.findByRole('heading', { name: 'Iniciar sesión' });
+  await waitFor(() =>
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Iniciar sesión' })),
+  );
 });
 
 it('does not load a denied route or issue its private API request', async () => {
@@ -163,31 +191,76 @@ it.each(['revoked', 'permissions-changed'] as const)(
     });
     if (change === 'revoked') await screen.findByRole('heading', { name: 'Iniciar sesión' });
     else await screen.findByText('No tienes permiso para esta sección de operativos.');
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toContain(
+        change === 'revoked' ? 'Iniciar sesión' : 'No tienes permiso',
+      ),
+    );
     await act(async () => pending.resolve({ default: PrivatePage }));
     expect(screen.queryByText(/Contenido privado/)).toBeNull();
     expect(fetchMock.mock.calls.some(([path]) => path === '/api/operatives')).toBe(false);
   },
 );
 
-it('resolves a pending module for the new account only, using its new session client', async () => {
-  const pending = deferred<{ default: ComponentType }>();
-  const load = vi.fn(() => pending.promise);
-  const fetchMock = setup(lazy(load));
-  await screen.findByText('Cargando sección…');
-  fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
-  await screen.findByRole('heading', { name: 'Iniciar sesión' });
-  fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: 'next-admin' } });
-  fireEvent.change(screen.getByLabelText('Contraseña'), {
-    target: { value: 'synthetic-password' },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
-  await screen.findByRole('heading', { name: 'Sesión activa' });
-  fireEvent.click(screen.getByRole('link', { name: 'Operativos' }));
-  await screen.findByText('Cargando sección…');
-  expect(fetchMock.mock.calls.some(([path]) => path === '/api/operatives')).toBe(false);
-  await act(async () => pending.resolve({ default: PrivatePage }));
-  await screen.findByText('Contenido privado de Cuenta nueva');
-  expect(screen.queryByText('Contenido privado de Cuenta anterior')).toBeNull();
-  await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
-  expect(localStorage.length + sessionStorage.length).toBe(0);
-});
+it.each([false, true])(
+  'resolves only the new account and respects subsequent focus intent (%s)',
+  async (movedFocus) => {
+    const pending = deferred<{ default: ComponentType }>();
+    const load = vi.fn(() => pending.promise);
+    const fetchMock = setup(lazy(load));
+    await screen.findByText('Cargando sección…');
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
+    await screen.findByRole('heading', { name: 'Iniciar sesión' });
+    fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: 'next-admin' } });
+    fireEvent.change(screen.getByLabelText('Contraseña'), {
+      target: { value: 'synthetic-password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
+    await screen.findByRole('heading', { name: 'Sesión activa' });
+    fireEvent.click(screen.getByRole('link', { name: 'Operativos' }));
+    await screen.findByText('Cargando sección…');
+    expect(fetchMock.mock.calls.some(([path]) => path === '/api/operatives')).toBe(false);
+    const logout = screen.getByRole('button', { name: 'Cerrar sesión' });
+    if (movedFocus) logout.focus();
+    await act(async () => pending.resolve({ default: PrivatePage }));
+    await screen.findByText('Contenido privado de Cuenta nueva');
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        movedFocus ? logout : screen.getByRole('heading', { name: 'Operativos de prueba' }),
+      ),
+    );
+    expect(screen.queryByText('Contenido privado de Cuenta anterior')).toBeNull();
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+    expect(localStorage.length + sessionStorage.length).toBe(0);
+  },
+);
+
+it.each(['success', 'failure'] as const)(
+  'does not steal focus after delayed lazy %s',
+  async (outcome) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let reject!: (reason: Error) => void;
+    const pending = deferred<{ default: ComponentType }>();
+    const result = new Promise<{ default: ComponentType }>((resolve, fail) => {
+      void pending.promise.then(resolve);
+      reject = fail;
+    });
+    setup(lazy(() => result));
+    await screen.findByText('Cargando sección…');
+    expect(document.activeElement).toBe(document.body);
+    expect(document.title).toContain('Cargando sección');
+    const logout = screen.getByRole('button', { name: 'Cerrar sesión' });
+    logout.focus();
+    await act(async () => {
+      if (outcome === 'success') pending.resolve({ default: PrivatePage });
+      else reject(new Error('synthetic failure'));
+    });
+    await screen.findByRole('heading', {
+      name: outcome === 'success' ? 'Operativos de prueba' : 'No se pudo cargar esta sección',
+    });
+    expect(document.activeElement).toBe(logout);
+    expect(document.title).toContain(
+      outcome === 'success' ? 'Operativos de prueba' : 'No se pudo cargar esta sección',
+    );
+  },
+);

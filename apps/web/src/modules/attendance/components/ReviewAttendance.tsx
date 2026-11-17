@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
+import { useConfirmationFocus } from '../../../hooks/use-confirmation-focus';
 import { HttpError } from '../../../lib/http';
 import { useSession } from '../../auth/hooks/use-session';
 import { administrativeDetailQuery, reviewAttendance } from '../api/administration';
@@ -24,6 +25,10 @@ const snapshot = (record: AdministrativeDetail) =>
   });
 
 export function ReviewAttendance({ record }: { record: AdministrativeDetail }) {
+  const section = useRef<HTMLElement>(null);
+  const summary = useRef<HTMLHeadingElement>(null);
+  const result = useRef<HTMLParagraphElement>(null);
+  const requestFocus = useConfirmationFocus();
   const { user } = useSession();
   const client = useQueryClient();
   const lock = useRef(false);
@@ -90,9 +95,13 @@ export function ReviewAttendance({ record }: { record: AdministrativeDetail }) {
   });
   if (!user?.permissions.includes('attendance:review')) return null;
   return (
-    <section className="max-w-form space-y-4 rounded-lg border bg-card p-4 sm:p-6">
+    <section ref={section} className="max-w-form space-y-4 rounded-lg border bg-card p-4 sm:p-6">
       <h2 className="text-heading-sm">Revisión administrativa</h2>
-      {notice && <p role={mutation.isSuccess ? 'status' : 'alert'}>{notice}</p>}
+      {notice && (
+        <p ref={result} tabIndex={-1} role={mutation.isSuccess ? 'status' : 'alert'}>
+          {notice}
+        </p>
+      )}
       {blocked ? (
         <Button
           variant="secondary"
@@ -121,7 +130,7 @@ export function ReviewAttendance({ record }: { record: AdministrativeDetail }) {
         </p>
       ) : confirmation ? (
         <section aria-label="Confirmación de revisión" className="space-y-4">
-          <h3 className="text-subheading">
+          <h3 ref={summary} tabIndex={-1} className="text-subheading">
             Confirmar {confirmation.input.decision === 'accept' ? 'aceptación' : 'rechazo'}
           </h3>
           <p className="break-all">
@@ -139,6 +148,7 @@ export function ReviewAttendance({ record }: { record: AdministrativeDetail }) {
               disabled={mutation.isPending}
               onClick={() => {
                 if (lock.current) return;
+                requestFocus(() => result.current);
                 lock.current = true;
                 mutation.mutate(confirmation);
               }}
@@ -148,7 +158,10 @@ export function ReviewAttendance({ record }: { record: AdministrativeDetail }) {
             <Button
               variant="secondary"
               disabled={mutation.isPending}
-              onClick={() => setConfirmation(null)}
+              onClick={() => {
+                requestFocus(() => section.current?.querySelector('#review-decision') ?? null);
+                setConfirmation(null);
+              }}
             >
               Volver sin aplicar
             </Button>
@@ -161,6 +174,7 @@ export function ReviewAttendance({ record }: { record: AdministrativeDetail }) {
           onSubmit={(event) =>
             void handleSubmit(async (input) => {
               if (lock.current) return;
+              requestFocus(() => summary.current ?? result.current);
               lock.current = true;
               setBusy(true);
               setNotice('');

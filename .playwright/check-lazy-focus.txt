@@ -1,0 +1,54 @@
+async page => {
+  // Run on Vite+ dev with a fresh document; requests are held/aborted, not replaced with fake modules.
+  const focused = locator => locator.evaluate(element => element === document.activeElement);
+  const tabTo = async locator => {
+    for (let index = 0; index < 80; index++) {
+      if (await focused(locator)) return;
+      await page.keyboard.press('Tab');
+    }
+    throw new Error('Unreachable keyboard target');
+  };
+  await page.goto('http://localhost:5173/');
+  await page.waitForFunction(() => document.activeElement?.textContent === 'Sesión activa');
+  let release;
+  await page.route('**/modules/operatives/pages/OperativesListPage.tsx*', async route => {
+    await new Promise(resolve => { release = resolve; });
+    await route.continue();
+  });
+  await tabTo(page.getByRole('link', { name: 'Operativos', exact: true }));
+  await page.keyboard.press('Enter');
+  await page.getByText('Cargando sección…', { exact: true }).waitFor();
+  if (!(await page.title()).includes('Cargando sección')) throw new Error('Missing pending context');
+  const logout = page.getByRole('button', { name: 'Cerrar sesión', exact: true });
+  await tabTo(logout);
+  release();
+  await page.getByRole('heading', { name: 'Operativos', exact: true }).waitFor();
+  await page.waitForFunction(() => document.title === 'Operativos | Heroínas y Héroes Paisanos');
+  if (!(await focused(logout))) throw new Error('Delayed import stole intentional keyboard focus');
+  await page.unroute('**/modules/operatives/pages/OperativesListPage.tsx*');
+  await tabTo(page.getByRole('link', { name: 'Inicio', exact: true }));
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.activeElement?.textContent === 'Sesión activa');
+  let imports = 0;
+  await page.route('**/modules/users/pages/UsersListPage.tsx*', async route => {
+    imports++;
+    await route.abort('failed');
+  });
+  await tabTo(page.getByRole('link', { name: 'Cuentas', exact: true }));
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.activeElement?.textContent === 'No se pudo cargar esta sección');
+  if (!(await page.title()).includes('No se pudo cargar esta sección')) throw new Error('Error context');
+  if (!(await logout.isEnabled())) throw new Error('Logout unavailable after import error');
+  await tabTo(page.getByRole('link', { name: 'Inicio', exact: true }));
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.activeElement?.textContent === 'Sesión activa');
+  await tabTo(page.getByRole('link', { name: 'Cuentas', exact: true }));
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.activeElement?.textContent === 'No se pudo cargar esta sección');
+  if (imports !== 1) throw new Error('Unexpected automatic import retry');
+  await page.unroute('**/modules/users/pages/UsersListPage.tsx*');
+  await page.reload();
+  await page.waitForFunction(() => document.activeElement?.textContent === 'Cuentas de usuario');
+  if (await page.title() !== 'Cuentas de usuario | Heroínas y Héroes Paisanos') throw new Error('Recovery context');
+  return { delayedLazyFocusPreserved: 'pass', failedImportFocus: 'pass', navigationRecovery: 'pass', manualReloadRecovery: 'pass' };
+}
