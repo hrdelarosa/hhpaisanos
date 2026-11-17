@@ -3,7 +3,13 @@ import { createParser, parseAsString, parseAsStringEnum, useQueryStates } from '
 import { Link, useLocation } from 'react-router';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
+import { DataTable, type DataTableColumn } from '../../../components/data-table';
+import { PageHeader } from '../../../components/page-header';
+import { PaginationPage } from '../../../components/pagination-page';
+import { StatusBadge } from '../../../components/status-badge';
+import { useSession } from '../../auth/hooks/use-session';
 import { listModules, modulesKey } from '../api/attention-modules';
+import type { AttentionModule } from '../schemas/attention-modules';
 import { moduleError } from '../utils/feedback';
 
 function positiveInteger(max: number) {
@@ -18,7 +24,35 @@ function positiveInteger(max: number) {
     serialize: String,
   });
 }
+
+const columns: DataTableColumn<AttentionModule>[] = [
+  {
+    key: 'name',
+    header: 'Nombre',
+    rowHeader: true,
+    cellClassName: 'min-w-48',
+    render: (module) => module.name,
+  },
+  {
+    key: 'municipality',
+    header: 'Municipio',
+    cellClassName: 'min-w-40',
+    render: (module) => module.municipality,
+  },
+  {
+    key: 'active',
+    header: 'Estado',
+    render: (module) => (
+      <StatusBadge
+        label={module.active ? 'Activo' : 'Inactivo'}
+        tone={module.active ? 'success' : 'neutral'}
+      />
+    ),
+  },
+];
+
 export function ModulesListPage() {
+  const { user } = useSession();
   const [filters, setFilters] = useQueryStates(
     {
       name: parseAsString.withDefault(''),
@@ -38,140 +72,125 @@ export function ModulesListPage() {
     enabled: valid,
   });
   return (
-    <div className="space-y-4">
-      <h1 className="text-heading">Módulos de atención</h1>
-      <p>Orden: creación descendente y, en caso de empate, identificador descendente.</p>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="space-y-2" htmlFor="module-search">
-          Nombre
-          <Input
-            id="module-search"
-            value={filters.name}
-            onChange={(event) => void setFilters({ name: event.target.value, page: 1 })}
-          />
-        </label>
-        <label className="space-y-2" htmlFor="municipality-search">
-          Municipio (coincidencia exacta)
-          <Input
-            id="municipality-search"
-            value={filters.municipality}
-            onChange={(event) => void setFilters({ municipality: event.target.value, page: 1 })}
-          />
-        </label>
-        <div className="space-y-2">
-          <label htmlFor="module-active">Estado</label>
-          <select
-            id="module-active"
-            className="flex min-h-touch w-full rounded-md border border-input bg-card px-3 text-body focus-visible:outline-2 focus-visible:outline-ring"
-            value={filters.active}
-            onChange={(event) => void setFilters({ active: event.target.value, page: 1 })}
-          >
-            <option value="">Todos</option>
-            <option value="true">Activo</option>
-            <option value="false">Inactivo</option>
-          </select>
+    <div className="min-w-0 space-y-6">
+      <PageHeader
+        title="Módulos de atención"
+        description="Consulta los puntos de atención, su municipio y disponibilidad."
+        actions={
+          user?.permissions.includes('attention-modules:create') && (
+            <Link
+              className="inline-flex min-h-touch items-center justify-center rounded-md bg-primary px-4 py-2 text-label text-primary-foreground hover:bg-primary-hover"
+              to="/modulos/nuevo"
+            >
+              Crear módulo
+            </Link>
+          )
+        }
+      />
+      <section aria-label="Filtros de módulos de atención" className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="block space-y-2 text-label" htmlFor="module-search">
+            Nombre
+            <Input
+              id="module-search"
+              value={filters.name}
+              onChange={(event) => void setFilters({ name: event.target.value, page: 1 })}
+            />
+          </label>
+          <label className="block space-y-2 text-label" htmlFor="municipality-search">
+            Municipio (coincidencia exacta)
+            <Input
+              id="municipality-search"
+              value={filters.municipality}
+              onChange={(event) => void setFilters({ municipality: event.target.value, page: 1 })}
+            />
+          </label>
+          <div className="space-y-2">
+            <label className="text-label" htmlFor="module-active">
+              Estado
+            </label>
+            <select
+              id="module-active"
+              className="flex min-h-touch w-full rounded-md border border-input bg-card px-3 text-body focus-visible:outline-2 focus-visible:outline-ring"
+              value={filters.active}
+              onChange={(event) => void setFilters({ active: event.target.value, page: 1 })}
+            >
+              <option value="">Todos</option>
+              <option value="true">Activo</option>
+              <option value="false">Inactivo</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-label" htmlFor="module-limit">
+              Registros por página
+            </label>
+            <Input
+              id="module-limit"
+              aria-describedby="module-limit-help"
+              type="number"
+              min={1}
+              max={100}
+              value={filters.limit}
+              onChange={(event) => {
+                const limit = Number(event.target.value);
+                if (Number.isInteger(limit) && limit >= 1 && limit <= 100)
+                  void setFilters({ limit, page: 1 });
+              }}
+            />
+            <span id="module-limit-help" className="block text-body-sm text-foreground-secondary">
+              Entre 1 y 100 registros.
+            </span>
+          </div>
         </div>
-        <div className="space-y-2">
-          <label htmlFor="module-limit">Registros por página</label>
-          <Input
-            id="module-limit"
-            aria-describedby="module-limit-help"
-            type="number"
-            min={1}
-            max={100}
-            value={filters.limit}
-            onChange={(event) => {
-              const limit = Number(event.target.value);
-              if (Number.isInteger(limit) && limit >= 1 && limit <= 100)
-                void setFilters({ limit, page: 1 });
-            }}
-          />
-          <span id="module-limit-help" className="block text-body-sm text-foreground-secondary">
-            Entre 1 y 100 registros.
-          </span>
-        </div>
-      </div>
-      <Button
-        variant="secondary"
-        onClick={() => void setFilters({ name: null, municipality: null, active: null, page: 1 })}
-      >
-        Limpiar filtros
-      </Button>
+        <Button
+          variant="secondary"
+          onClick={() => void setFilters({ name: null, municipality: null, active: null, page: 1 })}
+        >
+          Limpiar filtros
+        </Button>
+      </section>
+      <p className="text-body-sm text-muted-foreground">
+        Orden: creación descendente y, en caso de empate, identificador descendente.
+      </p>
       {!valid ? (
         <p role="alert">El nombre admite hasta 120 caracteres y el municipio hasta 100.</p>
-      ) : query.isPending ? (
-        <output className="block">Cargando módulos…</output>
-      ) : query.isError ? (
-        <div role="alert" className="space-y-2">
-          <p>{moduleError(query.error)}</p>
-          <Button variant="secondary" onClick={() => void query.refetch()}>
-            Reintentar
-          </Button>
-        </div>
       ) : (
-        <>
-          {query.data.items.length ? (
-            <div className="overflow-x-auto rounded-lg border bg-card">
-              <table className="w-full text-left text-body-sm">
-                <caption className="sr-only">Módulos de atención de Guerrero</caption>
-                <thead>
-                  <tr>
-                    {['Nombre', 'Municipio', 'Estado', 'Detalle'].map((label) => (
-                      <th key={label} scope="col" className="p-4">
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {query.data.items.map((module) => (
-                    <tr key={module.id} className="border-t">
-                      <th scope="row" className="p-4 font-medium">
-                        {module.name}
-                      </th>
-                      <td className="p-4">{module.municipality}</td>
-                      <td className="p-4">{module.active ? 'Activo' : 'Inactivo'}</td>
-                      <td className="p-4">
-                        <Link
-                          className="inline-flex min-h-touch items-center text-primary underline"
-                          aria-label={`Ver detalle de ${module.name}`}
-                          to={`/modulos/${module.id}${search}`}
-                        >
-                          Ver detalle
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <output className="block">
-              No hay módulos en esta página para los filtros seleccionados.
-            </output>
+        <DataTable
+          columns={columns}
+          data={query.data?.items}
+          isPending={query.isPending}
+          isError={query.isError}
+          isSuccess={query.isSuccess}
+          onRetry={() => void query.refetch()}
+          getRowKey={(module) => module.id}
+          caption="Módulos de atención de Guerrero"
+          regionLabel="Tabla de módulos de atención"
+          tableClassName="min-w-144"
+          loadingMessage="Cargando módulos…"
+          emptyMessage="No hay módulos en esta página para los filtros seleccionados."
+          errorMessage={query.isError ? moduleError(query.error) : ''}
+          renderActions={(module) => (
+            <Link
+              className="inline-flex min-h-touch items-center text-primary underline underline-offset-4"
+              aria-label={`Ver detalle de ${module.name}`}
+              to={`/modulos/${module.id}${search}`}
+            >
+              Ver detalle
+            </Link>
           )}
-          <nav aria-label="Paginación de módulos" className="flex flex-wrap items-center gap-4">
-            <Button
-              variant="secondary"
-              disabled={filters.page <= 1}
-              onClick={() => void setFilters({ page: filters.page - 1 })}
-            >
-              Anterior
-            </Button>
-            <p className="tabular-nums">
-              Página {query.data.page} de{' '}
-              {Math.max(1, Math.ceil(query.data.total / query.data.limit))} · {query.data.total}{' '}
-              registros
-            </p>
-            <Button
-              variant="secondary"
-              disabled={filters.page * filters.limit >= query.data.total}
-              onClick={() => void setFilters({ page: filters.page + 1 })}
-            >
-              Siguiente
-            </Button>
-          </nav>
-        </>
+        />
+      )}
+      {valid && query.isSuccess && (
+        <PaginationPage
+          label="Paginación de módulos"
+          page={query.data.page}
+          total={query.data.total}
+          limit={query.data.limit}
+          previousDisabled={filters.page <= 1}
+          nextDisabled={filters.page * filters.limit >= query.data.total}
+          onPreviousClick={() => void setFilters({ page: filters.page - 1 })}
+          onNextClick={() => void setFilters({ page: filters.page + 1 })}
+        />
       )}
     </div>
   );

@@ -8,29 +8,23 @@ export function OperativesLayout() {
   if (!user?.permissions.includes(permission))
     return <p role="alert">No tienes permiso para esta sección de operativos.</p>;
   return (
-    <section className="space-y-6">
-      <nav aria-label="Operativos" className="flex flex-wrap gap-4">
-        {user.permissions.includes('operatives:read') && (
-          <Link
-            className="inline-flex min-h-touch items-center text-primary underline"
-            to="/operativos"
-          >
-            Consultar operativos
-          </Link>
-        )}
-        {user.permissions.includes('operatives:create') && (
-          <Link
-            className="inline-flex min-h-touch items-center text-primary underline"
-            to="/operativos/nuevo"
-          >
-            Crear operativo
-          </Link>
-        )}
-      </nav>
-      <p className="text-foreground-secondary">
+    <section className="min-w-0 space-y-6">
+      {creating && (
+        <nav aria-label="Operativos" className="flex flex-wrap gap-4 text-body-sm">
+          {user.permissions.includes('operatives:read') && (
+            <Link
+              className="inline-flex min-h-touch items-center text-primary underline"
+              to="/operativos"
+            >
+              Consultar operativos
+            </Link>
+          )}
+        </nav>
+      )}
+      <Outlet />
+      <p className="border-t pt-4 text-body-sm text-muted-foreground">
         Ámbito administrativo: Guerrero. Sin aislamiento por oficina.
       </p>
-      <Outlet />
     </section>
   );
 }

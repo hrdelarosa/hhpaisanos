@@ -58,7 +58,10 @@ export function ActivateOperative({ operative }: { operative: Operative }) {
           de activar.
         </p>
       ) : confirmation ? (
-        <section aria-labelledby="activation-confirm-title" className="space-y-4">
+        <section
+          aria-labelledby="activation-confirm-title"
+          className="space-y-4 rounded-md border bg-muted p-4"
+        >
           <h3 id="activation-confirm-title" className="text-subheading">
             Confirmar activación
           </h3>
